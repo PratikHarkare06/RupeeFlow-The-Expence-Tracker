@@ -1,0 +1,7 @@
+{
+  "project_name": "RupeeFlow",
+  "description": "Your intelligent expense companion",
+  "env_image_name": "rupeeflow_fastapi_react_mongo_base_image:latest",
+  "job_id": "b8cbcc85-8189-483c-a4d2-7392b1beeaf6",
+  "created_at": "2025-10-03T14:40:28.513825+00:00Z",
+}
