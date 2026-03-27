@@ -9,15 +9,11 @@ node_modules/
 /node_modules
 /.pnp
 .pnp.js
-.yarn/install-state.gz
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
 
 # Testing
 /coverage
+.pytest_cache/
+**/.pytest_cache/
 
 # Next.js
 /.next/
@@ -30,8 +26,9 @@ next-env.d.ts
 dist/
 dist
 
-# Environment files (comprehensive coverage)
-
+# Environment files
+*.env
+*.env.*
 *token.json*
 *credentials.json*
 
@@ -52,17 +49,28 @@ __pycache__/
 venv/
 .venv/
 
-# Development tools
+# Backend runtime uploads (user-uploaded receipts, not source code)
+backend/uploads/
+
+# Backend seed / debug / one-off test scripts
+backend/check_db*.py
+backend/seed_*.py
+backend/test_forecast_api.py
+backend/test_ocr.py
+backend/test_receipt_debug.py
+
+# Development tools & config
 chainlit.md
 .chainlit
 .ipynb_checkpoints/
-.ac
+.rupeeflow/
+.gitconfig
 
 # Deployment
 .vercel
 
-# Data and databases
-agenthub/agents/youtube/db
+# Build caches
+.cache/
 
 # Archive files and large assets
 **/*.zip
@@ -73,11 +81,16 @@ agenthub/agents/youtube/db
 *.deb
 *.dylib
 
-# Build caches
-.cache/
+# Design/screenshot dumps
+design-screenshots/
 
-# Mobile development
-android-sdk/ -e 
-# Environment files
-*.env
-*.env.*
+# Yarn lock (use package-lock.json instead)
+frontend/yarn.lock
+yarn.lock
+
+# Top-level stray files
+/package-lock.json
+backend_test.py
+specific_issue_test.py
+test_result.md
+/tests/
