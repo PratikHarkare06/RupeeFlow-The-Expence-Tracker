@@ -1,554 +1,490 @@
-# RupeeFlow
+# RupeeFlow 💸
 
-**Your intelligent expense companion**
+> **Your intelligent, AI-powered expense companion — built for modern Indian financial management.**
 
-A professional, AI-powered expense tracking application designed for comprehensive financial management. RupeeFlow provides intelligent categorization, receipt scanning, and detailed analytics to help you manage your expenses efficiently.
+![RupeeFlow](frontend/public/logo.png)
 
-## 🌟 Features
+RupeeFlow is a full-stack expense tracking platform that combines **AI-driven insights**, **shared wallet capabilities**, **receipt OCR scanning**, **multi-currency support**, and a bold **Neo-brutalism UI** to make personal finance tracking effortless and engaging.
+
+---
+
+## ✨ Features
 
 ### 💰 Expense Management
-- **Quick Expense Entry**: Add expenses manually with detailed categorization
-- **AI-Powered Categorization**: Automatic expense categorization using intelligent algorithms
-- **Receipt Scanning**: Upload and scan receipts with OCR technology for automatic data extraction
-- **Multi-Category Support**: 16 predefined categories for Indian expense patterns
+- **Quick Manual Entry** — Add expenses with title, amount, category, date, notes, and currency
+- **AI-Powered Auto-Categorization** — Gemini AI automatically suggests the correct category on entry
+- **Anomaly Detection** — Real-time alerts when an expense is statistically unusual for its category
+- **Delete Expenses** — Remove any individual expense from your history
+- **Export to CSV** — Download your full expense history as a spreadsheet
+- **Export to PDF** — Generate a formatted PDF report of all expenses (via ReportLab)
+- **16 Predefined Categories** — Tailored for Indian spending patterns (Food & Dining, Transport, Home & Family, etc.)
+
+### 📸 Receipt Scanning (OCR)
+- **Upload Receipt Images** — PNG, JPG, JPEG supported
+- **AI Data Extraction** — Gemini Vision extracts: merchant name, total amount, date, currency, tax, items
+- **Multi-Currency Receipt Support** — Auto-detects currency and converts to INR
+- **Auto-Fill Form** — Extracted data pre-populates the expense form for quick confirmation
+
+### 🌍 Multi-Currency Support
+- **5 Currencies** — INR, USD, EUR, GBP, JPY
+- **Live Exchange Rates** — Fetched from ExchangeRate-API with caching
+- **Per-Expense Currency** — Each expense can be recorded in its original currency
+- **Dashboard Conversion** — All totals displayed in your selected currency
+
+### 👥 Shared Wallets (Group Expenses)
+- **Create Wallets** — Create named shared expense groups
+- **Join by Invite Code** — Share a unique code for others to join your wallet
+- **Group Expense Tracking** — Add and view expenses within a shared wallet
+- **Settlement Calculation** — Automatic who-owes-whom calculation for the group
+- **Dashboard Overview** — See all your wallets at a glance from the main dashboard
 
 ### 📊 Analytics & Insights
-- **Dashboard Overview**: Comprehensive view of spending patterns and statistics
-- **Category Breakdown**: Visual representation of spending by category with progress bars
-- **Monthly Trends**: Track spending patterns over time with trend analysis
-- **AI Insights**: Get personalized recommendations and spending alerts
-
-### 👤 User Management
-- **User Profiles**: Detailed user dashboard with account information
-- **Secure Authentication**: JWT-based authentication system
-- **Profile Management**: View user statistics, recent expenses, and account details
+- **Dashboard** — Total expenses, total amount, active categories, recent activity
+- **Monthly Analytics** — Configurable look-back (default 6 months) with bar chart
+- **Category Breakdown** — Pie chart + ranked list with amounts per category
+- **Monthly Trends Chart** — Line/bar chart of spending month by month
+- **AI Insights Panel** — Personalized tips, overspending alerts, and pattern observations
+- **Spending Forecasting** — Predicts next month's expected spend based on historical data
 
 ### 🤖 AI Assistant
-- **Intelligent Chat**: Ask questions about your expenses in natural language
-- **Expense Queries**: Get instant answers about spending patterns, categories, and totals
-- **Smart Analytics**: AI-powered expense analysis and recommendations
+- **Natural Language Chat** — Ask anything about your finances in plain English or Hindi
+- **Expense Queries** — "How much did I spend on food this month?", "Show my top 5 expenses"
+- **Spending Summaries** — Instant summaries by category, time range, or custom queries
+- **Powered by Gemini** — Uses Google Gemini with automatic model fallback
+
+### 🎯 Budget Management
+- **Set Monthly Budgets** — Define a spending limit per category per month
+- **Live Progress Tracking** — Visual progress bar showing spent vs budget
+- **Overspend Warnings** — Color-coded alerts when approaching or exceeding budget
+- **Budget CRUD** — Create, view, and delete budgets
+
+### 🔁 Recurring Expenses
+- **Automated Tracking** — Define expenses that recur daily, weekly, or monthly
+- **Background Worker** — Server auto-creates recurring entries on schedule
+- **Toggle On/Off** — Pause/resume recurring expenses without deleting them
+- **Manage Subscriptions** — Perfect for rent, subscriptions, EMIs
+
+### 🏆 Financial Goals
+- **Create Goals** — Set a target amount with a name (e.g., "Emergency Fund ₹1,00,000")
+- **Contribute Progress** — Log contributions toward a goal over time
+- **Visual Progress** — Percentage and progress bar for each goal
+- **Delete Goals** — Remove completed or abandoned goals
+
+### 🔐 Authentication & Security
+- **JWT Authentication** — Secure token-based auth with configurable expiry
+- **Bcrypt Password Hashing** — Industry-standard password storage
+- **Rate Limiting** — SlowAPI-based rate limiting to prevent abuse
+- **Route Protection** — All data endpoints require valid Bearer tokens
+- **CORS Configured** — Controlled cross-origin access
+
+### 🎨 Neo-brutalism UI Design
+- **Bold Design System** — Thick black borders, hard box-shadows, sharp corners
+- **Custom Logo** — Branded ₹ rupee + bar-chart icon
+- **IBM Plex Sans** — Primary font (clean, geometric)
+- **Work Sans** — Display/heading font
+- **IBM Plex Mono** — Monospace for code/data
+- **Collapsible Sidebar** — Close/open with animated transition and floating hamburger button
+- **Active Nav Indicator** — Black background + yellow text + yellow left-border bar
+- **Yellow Accent System** — `#FDE047` as the primary accent for active/highlight states
+- **Responsive Layout** — Mobile horizontal tab bar, desktop vertical sidebar
+
+---
 
 ## 🛠️ Technology Stack
 
 ### Frontend
-- **React.js**: Modern JavaScript framework for building user interfaces
-- **Tailwind CSS**: Utility-first CSS framework for professional styling
-- **Axios**: HTTP client for API communication
-- **JavaScript ES6+**: Modern JavaScript features and syntax
+| Technology | Purpose |
+|---|---|
+| **React 19** | UI framework |
+| **Tailwind CSS v3** | Utility-first styling |
+| **Recharts** | Charts (bar, pie, line) |
+| **Axios** | HTTP client |
+| **IBM Plex Sans / Work Sans / IBM Plex Mono** | Google Fonts typography |
 
 ### Backend
-- **FastAPI**: High-performance Python web framework
-- **MongoDB**: NoSQL database for flexible data storage
-- **Python 3.8+**: Backend programming language
-- **JWT Authentication**: Secure token-based authentication
-- **OCR Integration**: Receipt scanning and data extraction
+| Technology | Purpose |
+|---|---|
+| **FastAPI** | Async Python web framework |
+| **Motor (AsyncIOMotorClient)** | Async MongoDB driver |
+| **MongoDB** | NoSQL database |
+| **Google Generative AI (Gemini)** | AI chat, categorization, forecasting, OCR |
+| **python-jose (JWT)** | Authentication tokens |
+| **Passlib + Bcrypt** | Password hashing |
+| **SlowAPI** | Rate limiting |
+| **ReportLab** | PDF export generation |
+| **Pillow** | Image processing for receipts |
+| **aiofiles** | Async file handling |
+| **httpx** | Async HTTP for exchange rate API |
 
-### Additional Features
-- **Professional UI**: Corporate-grade design with clean typography
-- **Responsive Design**: Works seamlessly on desktop and mobile devices
-- **Real-time Updates**: Live data synchronization across components
+---
 
 ## 📁 Project Structure
 
 ```
-RupeeFlow/
-├── frontend/                 # React.js frontend application
-│   ├── public/              # Static assets and HTML template
-│   ├── src/                 # Source code
-│   │   ├── App.js          # Main application component
-│   │   ├── App.css         # Application styles
-│   │   └── index.js        # Application entry point
-│   ├── package.json        # Frontend dependencies
-│   └── package-lock.json   # Dependency lock file
-├── backend/                 # FastAPI backend application
-│   ├── server.py           # Main server file with API endpoints
-│   └── requirements.txt    # Python dependencies
-└── README.md               # Project documentation
+RupeeFlow-The-Expence-Tracker/
+├── backend/
+│   ├── server.py              # FastAPI app — all routes & business logic
+│   ├── receipt_processor.py   # Gemini Vision OCR receipt extraction
+│   ├── requirements.txt       # Python dependencies
+│   ├── pytest.ini             # Test configuration
+│   ├── tests/
+│   │   ├── __init__.py
+│   │   ├── conftest.py        # Pytest fixtures
+│   │   └── test_budgets.py    # Budget API tests
+│   └── .env                   # Backend environment variables (not committed)
+│
+├── frontend/
+│   ├── public/
+│   │   ├── index.html         # HTML template + Google Fonts
+│   │   └── logo.png           # Custom RupeeFlow brand logo
+│   ├── src/
+│   │   ├── App.js             # Main application (all pages/components)
+│   │   ├── App.css            # Global application styles
+│   │   ├── index.css          # Tailwind directives + base font config
+│   │   └── index.js           # React entry point
+│   ├── tailwind.config.js     # Tailwind theme (fonts, colors, animations)
+│   ├── package.json           # Frontend dependencies
+│   └── .env                   # Frontend environment variables (not committed)
+│
+├── .gitignore                 # Comprehensive ignore rules
+└── README.md                  # This file
 ```
 
-## 🚀 Installation & Setup
+---
+
+## 🚀 Setup & Installation
 
 ### Prerequisites
-- **Node.js** (v14 or higher)
-- **Python** (v3.8 or higher)
-- **MongoDB** (v4.4 or higher)
-- **npm** or **yarn** package manager
+- **Node.js** v16+
+- **Python** 3.9+
+- **MongoDB** 4.4+ (local or Atlas)
+- **Google Gemini API Key** — [Get one here](https://aistudio.google.com/app/apikey)
+
+---
 
 ### Backend Setup
 
-1. **Navigate to backend directory**
-   ```bash
-   cd backend
-   ```
+```bash
+cd backend
 
-2. **Create virtual environment**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+# Create and activate virtual environment
+python -m venv venv
+source venv/bin/activate        # macOS/Linux
+# venv\Scripts\activate         # Windows
 
-3. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+# Install dependencies
+pip install -r requirements.txt
+```
 
-4. **Set up environment variables**
-   Create a `.env` file in the backend directory:
-   ```env
-   MONGODB_URL=mongodb://localhost:27017
-   DATABASE_NAME=rupeeflow
-   SECRET_KEY=your-secret-key-here
-   ALGORITHM=HS256
-   ACCESS_TOKEN_EXPIRE_MINUTES=30
-   ```
+Create `backend/.env`:
+```env
+MONGODB_URL=mongodb://localhost:27017
+DATABASE_NAME=rupeeflow
+SECRET_KEY=your-super-secret-key-change-in-production
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+GEMINI_API_KEY=your-gemini-api-key-here
+GEMINI_MODEL=gemini-2.0-flash
+```
 
-5. **Start MongoDB service**
-   ```bash
-   # On macOS with Homebrew
-   brew services start mongodb/brew/mongodb-community
-   
-   # On Ubuntu/Debian
-   sudo systemctl start mongod
-   
-   # On Windows
-   net start MongoDB
-   ```
+Start MongoDB:
+```bash
+# macOS (Homebrew)
+brew services start mongodb/brew/mongodb-community
 
-6. **Run the backend server**
-   ```bash
-   python server.py
-   ```
-   
-   The backend will be available at `http://127.0.0.1:8001`
+# Linux
+sudo systemctl start mongod
+
+# Windows
+net start MongoDB
+```
+
+Run the server:
+```bash
+python server.py
+# → Available at http://127.0.0.1:8001
+# → Swagger docs at http://127.0.0.1:8001/docs
+```
+
+---
 
 ### Frontend Setup
 
-1. **Navigate to frontend directory**
-   ```bash
-   cd frontend
-   ```
+```bash
+cd frontend
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+# Install dependencies
+npm install
 
-3. **Set up environment variables**
-   Create a `.env` file in the frontend directory:
-   ```env
-   REACT_APP_API_URL=http://127.0.0.1:8001
-   ```
+# Create frontend/.env
+echo "REACT_APP_API_URL=http://127.0.0.1:8001" > .env
 
-4. **Start the development server**
-   ```bash
-   npm start
-   ```
-   
-   The frontend will be available at `http://localhost:3000`
-
-## 🎯 Usage Guide
-
-### Getting Started
-
-1. **User Registration**
-   - Open RupeeFlow in your browser
-   - Click "Create an account" on the welcome page
-   - Fill in your details (Full Name, Email, Password)
-   - Click "Create Account" to register
-
-2. **User Login**
-   - Enter your email and password
-   - Click "Sign in" to access your dashboard
-
-### Adding Expenses
-
-#### Manual Entry
-1. Navigate to "Add Expense" tab
-2. Fill in expense details:
-   - Amount
-   - Description
-   - Category (from 16 predefined options)
-   - Date
-   - Optional notes
-3. Click "Add Expense" to save
-
-#### Receipt Scanning
-1. Navigate to "Scan Receipt" tab
-2. Upload a receipt image (PNG, JPG, PDF)
-3. Wait for AI processing
-4. Review extracted data
-5. Confirm or edit details
-6. Save the expense
-
-### Viewing Analytics
-
-#### Dashboard Overview
-- View total expenses, spending amount, and active categories
-- See recent expenses with quick details
-- Monitor category breakdown with visual progress bars
-
-#### Profile Dashboard
-- Access comprehensive user statistics
-- View expense statistics (total spent, transaction count, averages)
-- Monitor category breakdown with percentages
-- Track monthly spending trends
-- Review recent expense history
-
-### Using AI Assistant
-
-1. Navigate to "Assistant" tab
-2. Ask questions in natural language:
-   - "How much did I spend this month?"
-   - "Show me my food expenses"
-   - "What are my top spending categories?"
-   - "Show recent expenses"
-3. Get instant answers with formatted data
-
-## 📊 API Documentation
-
-### Authentication Endpoints
-
-#### Register User
-```http
-POST /auth/register
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "password": "securepassword",
-  "full_name": "John Doe"
-}
+# Start development server
+npm start
+# → Available at http://localhost:3000
 ```
 
-#### Login User
-```http
-POST /auth/login
-Content-Type: application/x-www-form-urlencoded
+---
 
-username=user@example.com&password=securepassword
-```
+## 📡 API Reference
 
-### Expense Endpoints
+### Authentication
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/auth/register` | Register a new user |
+| `POST` | `/auth/login` | Login and receive JWT token |
+| `GET` | `/auth/me` | Get current user info |
 
-#### Create Expense
-```http
-POST /expenses
-Authorization: Bearer <token>
-Content-Type: application/json
+### Expenses
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/expenses` | List all expenses |
+| `POST` | `/expenses` | Create a new expense |
+| `DELETE` | `/expenses/{id}` | Delete an expense |
+| `GET` | `/expenses/export/csv` | Export expenses as CSV |
+| `GET` | `/expenses/export/pdf` | Export expenses as PDF |
+| `POST` | `/expenses/receipt` | Upload receipt image for OCR extraction |
 
-{
-  "title": "Grocery Shopping",
-  "amount": 1500.00,
-  "date": "2024-01-15",
-  "category": "Groceries & Household",
-  "description": "Weekly groceries"
-}
-```
+### Analytics & AI
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/analytics/monthly?months=6` | Monthly spending breakdown |
+| `GET` | `/insights` | AI-generated spending insights |
+| `GET` | `/forecast` | AI spending forecast for next month |
+| `POST` | `/assistant/chat` | Natural language AI chat |
 
-#### Get All Expenses
-```http
-GET /expenses
-Authorization: Bearer <token>
-```
+### Budgets
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/budgets` | List all budgets |
+| `POST` | `/budgets` | Create a budget |
+| `DELETE` | `/budgets/{id}` | Delete a budget |
 
-#### Delete Expense
-```http
-DELETE /expenses/{expense_id}
-Authorization: Bearer <token>
-```
+### Recurring Expenses
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/recurring` | List recurring expenses |
+| `POST` | `/recurring` | Create a recurring expense |
+| `PUT` | `/recurring/{id}/toggle` | Enable/disable recurring expense |
+| `DELETE` | `/recurring/{id}` | Delete recurring expense |
 
-### Analytics Endpoints
+### Financial Goals
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/goals` | List all goals |
+| `POST` | `/goals` | Create a goal |
+| `POST` | `/goals/{id}/contribute` | Add contribution to a goal |
+| `DELETE` | `/goals/{id}` | Delete a goal |
 
-#### Monthly Analytics
-```http
-GET /analytics/monthly?months=6
-Authorization: Bearer <token>
-```
+### Shared Wallets
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/groups` | Create a shared wallet |
+| `GET` | `/groups` | List your wallets |
+| `POST` | `/groups/join` | Join wallet by invite code |
+| `POST` | `/groups/{id}/expenses` | Add expense to wallet |
+| `GET` | `/groups/{id}/expenses` | List wallet expenses |
+| `GET` | `/groups/{id}/settlements` | Get settlement breakdown |
 
-#### AI Insights
-```http
-GET /insights
-Authorization: Bearer <token>
-```
+### User Profile
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/user/dashboard` | Full profile stats (totals, categories, trends) |
 
-#### User Dashboard
-```http
-GET /user/dashboard
-Authorization: Bearer <token>
-```
-
-### Receipt Processing
-
-#### Upload Receipt
-```http
-POST /expenses/receipt
-Authorization: Bearer <token>
-Content-Type: multipart/form-data
-
-file: <receipt_image>
-```
+---
 
 ## 🎨 Design System
 
 ### Color Palette
-- **Primary**: Slate-700 (Corporate branding)
-- **Secondary**: Blue-600 (Accent elements)
-- **Text**: Gray-900 (Primary text)
-- **Muted**: Gray-500 (Secondary text)
-- **Background**: Gray-50 (Page background)
-- **Cards**: White (Content containers)
+| Token | Color | Usage |
+|---|---|---|
+| **Black** | `#000000` | Borders, active states, headers |
+| **Yellow** | `#FDE047` | Active nav, accents, icon badges |
+| **White** | `#FFFFFF` | Cards, backgrounds |
+| **Gray-50** | `#F9FAFB` | Page background |
+| **Red-600** | `#DC2626` | Destructive actions, sign out hover |
 
 ### Typography
-- **Headers**: Font-semibold, tracking-tight
-- **Body**: Font-medium for emphasis, font-normal for content
-- **Labels**: Font-medium, text-sm for form labels
+| Font | Family | Usage |
+|---|---|---|
+| **IBM Plex Sans** | `font-sans` | All body text, labels, nav |
+| **Work Sans** | `font-display` | Display headings |
+| **IBM Plex Mono** | `font-mono` | Code, numeric data |
 
-### Components
-- **Cards**: Rounded-lg with subtle shadows
-- **Buttons**: Professional styling with hover effects
-- **Forms**: Clean inputs with proper spacing
-- **Navigation**: Tab-based navigation with professional styling
+### Neo-brutalism Component Rules
+```css
+/* Card */
+border: 2px solid black;
+box-shadow: 4px 4px 0px 0px rgba(0,0,0,1);
 
-## 🔧 Configuration
+/* Active nav item */
+background: black;
+color: #FDE047;
+border-left: 4px solid #FDE047;
 
-### Environment Variables
+/* Buttons */
+border: 2px solid black;
+box-shadow: 2px 2px 0px 0px rgba(0,0,0,1);
+/* On hover: shadow collapses → simulates press */
+```
 
-#### Backend (.env)
+---
+
+## 🔧 Environment Variables
+
+### Backend (`backend/.env`)
 ```env
-# Database Configuration
 MONGODB_URL=mongodb://localhost:27017
 DATABASE_NAME=rupeeflow
-
-# Authentication
-SECRET_KEY=your-super-secret-key-here
+SECRET_KEY=change-this-in-production
 ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-
-# Server Configuration
-HOST=127.0.0.1
-PORT=8001
-DEBUG=True
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+GEMINI_API_KEY=your-gemini-api-key
+GEMINI_MODEL=gemini-2.0-flash
 ```
 
-#### Frontend (.env)
+### Frontend (`frontend/.env`)
 ```env
-# API Configuration
 REACT_APP_API_URL=http://127.0.0.1:8001
-
-# Development Configuration
-REACT_APP_DEBUG=true
-GENERATE_SOURCEMAP=false
 ```
+
+---
 
 ## 🚨 Troubleshooting
 
-### Common Issues
+### Backend
 
-#### Backend Issues
-
-**MongoDB Connection Error**
+**MongoDB won't connect**
 ```bash
 # Check if MongoDB is running
 ps aux | grep mongod
 
-# Start MongoDB service
-brew services start mongodb/brew/mongodb-community  # macOS
-sudo systemctl start mongod                         # Linux
+# Start MongoDB
+brew services start mongodb/brew/mongodb-community   # macOS
+sudo systemctl start mongod                          # Linux
 ```
 
-**Port Already in Use**
+**Port 8001 already in use**
 ```bash
-# Find process using port 8001
 lsof -i :8001
-
-# Kill the process
 kill -9 <PID>
 ```
 
-#### Frontend Issues
+**Gemini API errors**
+- Ensure `GEMINI_API_KEY` is set in `backend/.env`
+- The server auto-discovers available models — check logs for which model is in use
+- Free tier has quota limits; the assistant will return an error message if quota exceeded
 
-**Module Not Found Error**
+### Frontend
+
+**Module not found / build errors**
 ```bash
-# Clear node_modules and reinstall
-rm -rf node_modules package-lock.json
+cd frontend
+rm -rf node_modules
 npm install
 ```
 
-**CORS Error**
-- Ensure backend is running on correct port
-- Check REACT_APP_API_URL in frontend .env file
-- Verify CORS configuration in backend
-
-#### Database Issues
-
-**Authentication Failed**
-- Check MongoDB credentials
-- Verify database permissions
-- Ensure user has read/write access
-
-## 🤝 Contributing
-
-### Development Workflow
-
-1. **Fork the repository**
-2. **Create a feature branch**
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-3. **Make your changes**
-4. **Test thoroughly**
-5. **Commit with descriptive messages**
-   ```bash
-   git commit -m "Add: New expense categorization feature"
-   ```
-6. **Push to your fork**
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-7. **Create a Pull Request**
-
-### Code Style Guidelines
-
-#### Frontend (JavaScript/React)
-- Use functional components with hooks
-- Follow ESLint configuration
-- Use meaningful variable and function names
-- Add comments for complex logic
-- Maintain consistent indentation (2 spaces)
-
-#### Backend (Python)
-- Follow PEP 8 style guidelines
-- Use type hints where applicable
-- Add docstrings for functions and classes
-- Handle errors gracefully
-- Use meaningful variable names
-
-## 📝 License
-
-This project is licensed under the MIT License. See the LICENSE file for details.
-
-## 🏗️ Architecture
-
-### System Architecture
-```
-┌─────────────────┐    HTTP/REST    ┌─────────────────┐
-│   React.js      │◄──────────────►│   FastAPI       │
-│   Frontend      │                 │   Backend       │
-└─────────────────┘                 └─────────────────┘
-                                             │
-                                             │ Database
-                                             ▼
-                                    ┌─────────────────┐
-                                    │   MongoDB       │
-                                    │   Database      │
-                                    └─────────────────┘
-```
-
-### Data Flow
-1. **User Interaction**: User interacts with React frontend
-2. **API Request**: Frontend sends HTTP requests to FastAPI backend
-3. **Authentication**: JWT tokens validate user requests
-4. **Data Processing**: Backend processes data and business logic
-5. **Database Operations**: MongoDB stores and retrieves data
-6. **Response**: Data flows back through the stack to the user
-
-## 🔐 Security
-
-### Authentication & Authorization
-- **JWT Tokens**: Secure token-based authentication
-- **Password Hashing**: Bcrypt for secure password storage
-- **Token Expiration**: Configurable token expiry times
-- **Route Protection**: Protected routes require valid tokens
-
-### Data Security
-- **Input Validation**: Server-side validation for all inputs
-- **SQL Injection Prevention**: MongoDB queries with proper sanitization
-- **CORS Configuration**: Controlled cross-origin resource sharing
-- **Error Handling**: Secure error messages without sensitive data exposure
-
-## 📈 Performance
-
-### Frontend Optimization
-- **Code Splitting**: Lazy loading for improved initial load times
-- **Memoization**: React optimization hooks for expensive calculations
-- **Image Optimization**: Optimized image loading and caching
-- **Bundle Size**: Minimal dependencies for faster loading
-
-### Backend Optimization
-- **Database Indexing**: Optimized MongoDB queries with proper indexing
-- **Async Operations**: Non-blocking I/O operations
-- **Error Handling**: Efficient error handling and logging
-- **API Rate Limiting**: Protection against abuse
-
-## 🌐 Deployment
-
-### Production Deployment
-
-#### Backend Deployment
-```bash
-# Install production dependencies
-pip install -r requirements.txt
-
-# Set production environment variables
-export DEBUG=False
-export MONGODB_URL=your-production-mongodb-url
-
-# Run with production server
-uvicorn server:app --host 0.0.0.0 --port 8001
-```
-
-#### Frontend Deployment
-```bash
-# Build for production
-npm run build
-
-# Serve static files
-# Deploy dist/ folder to your hosting service
-```
-
-### Docker Deployment
-```dockerfile
-# Backend Dockerfile
-FROM python:3.9-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY . .
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001"]
-
-# Frontend Dockerfile
-FROM node:16-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-RUN npm run build
-CMD ["npm", "start"]
-```
-
-## 📞 Support
-
-### Getting Help
-- **Documentation**: Check this README for detailed information
-- **Issues**: Report bugs and feature requests via GitHub Issues
-- **Community**: Join our community discussions
-- **Support**: Contact support for enterprise inquiries
-
-### FAQ
-
-**Q: How do I reset my password?**
-A: Currently, password reset functionality is not implemented. Contact support for assistance.
-
-**Q: Can I export my expense data?**
-A: Data export functionality is planned for future releases.
-
-**Q: Is my financial data secure?**
-A: Yes, we use industry-standard security practices including JWT authentication and encrypted data storage.
-
-**Q: Can I use RupeeFlow offline?**
-A: Currently, RupeeFlow requires an internet connection. Offline functionality is planned for future releases.
+**CORS errors**
+- Confirm backend is running on port `8001`
+- Confirm `REACT_APP_API_URL=http://127.0.0.1:8001` in `frontend/.env`
+- Restart frontend dev server after changing `.env`
 
 ---
 
-**RupeeFlow** - Your intelligent expense companion
-Built with ❤️ for better financial management
+## 🚢 Deployment
+
+### Backend (Production)
+```bash
+# Install deps
+pip install -r requirements.txt
+
+# Set environment variables
+export DEBUG=False
+export MONGODB_URL=your-atlas-connection-string
+export SECRET_KEY=your-production-secret
+
+# Run with uvicorn
+uvicorn server:app --host 0.0.0.0 --port 8001 --workers 2
+```
+
+### Frontend (Production)
+```bash
+cd frontend
+npm run build
+# Serve the build/ folder with nginx, Vercel, Netlify, or any static host
+```
+
+### Docker (Quick Start)
+```dockerfile
+# backend/Dockerfile
+FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001"]
+
+# frontend/Dockerfile
+FROM node:18-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=build /app/build /usr/share/nginx/html
+```
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/your-feature`
+3. Commit with clear messages: `git commit -m "feat: add expense filtering"`
+4. Push: `git push origin feature/your-feature`
+5. Open a Pull Request
+
+### Code Style
+- **Frontend**: Functional React components, hooks, Tailwind utility classes
+- **Backend**: PEP 8, type hints, async/await throughout, docstrings on public functions
+
+---
+
+## 📝 License
+
+MIT License — see [LICENSE](LICENSE) for details.
+
+---
+
+## 🏗️ Architecture
+
+```
+┌──────────────────────────┐       REST/JSON        ┌──────────────────────────┐
+│   React 19 Frontend      │◄─────────────────────►│   FastAPI Backend        │
+│                          │                         │                          │
+│  • Neo-brutalism UI      │                         │  • JWT Auth              │
+│  • Recharts analytics    │                         │  • Rate Limiting         │
+│  • IBM Plex Sans fonts   │                         │  • Async Motor driver    │
+│  • Sidebar + 11 tabs     │                         │  • Gemini AI integration │
+└──────────────────────────┘                         └──────────┬───────────────┘
+                                                                │
+                                          ┌─────────────────────┼──────────────┐
+                                          │                     │              │
+                                   ┌──────▼──────┐   ┌─────────▼──────┐  ┌────▼────────┐
+                                   │   MongoDB   │   │  Google Gemini │  │ ExchangeRate│
+                                   │  (Motor)    │   │   AI (Vision,  │  │    API      │
+                                   │             │   │   Chat, NLP)   │  │  (Cached)   │
+                                   └─────────────┘   └────────────────┘  └─────────────┘
+```
+
+---
+
+<div align="center">
+
+**RupeeFlow** — Built with ❤️ for better financial clarity
+
+[GitHub](https://github.com/PratikHarkare06/RupeeFlow-The-Expence-Tracker) · [Report Bug](https://github.com/PratikHarkare06/RupeeFlow-The-Expence-Tracker/issues) · [Request Feature](https://github.com/PratikHarkare06/RupeeFlow-The-Expence-Tracker/issues)
+
+</div>
