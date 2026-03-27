@@ -1,6 +1,11 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect, createContext, useContext, useRef } from 'react';
 import './App.css';
 import axios from 'axios';
+import { 
+  PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, 
+  LineChart, Line, AreaChart, Area, CartesianGrid, ComposedChart, ReferenceLine
+} from 'recharts';
+
 
 const API = process.env.REACT_APP_API_URL;
 
@@ -8,7 +13,8 @@ const API = process.env.REACT_APP_API_URL;
 const AuthContext = createContext(null);
 
 // Configure axios
-axios.defaults.timeout = 30000;
+axios.defaults.timeout = 120000; // Increase to 120s for AI processing
+axios.defaults.headers.common['Authorization'] = 'Bearer mock-token'; // Global auth bypass
 
 // Add response interceptor for global error handling
 axios.interceptors.response.use(
@@ -27,34 +33,19 @@ axios.interceptors.response.use(
 
 // Auth Provider Component
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('token'));
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState({ id: 'dev-user', full_name: 'Development User', email: 'dev@rupeeflow.com' });
+  const [token, setToken] = useState('mock-token');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const initAuth = async () => {
-      if (token) {
-        try {
-          // Set axios default header
-          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-          // Fetch user profile
-          await fetchUserProfile();
-        } catch (error) {
-          console.error('Auth initialization failed:', error);
-          delete axios.defaults.headers.common['Authorization'];
-        }
-      } else {
-        delete axios.defaults.headers.common['Authorization'];
-      }
-      setLoading(false);
-    };
-    
-    initAuth();
-  }, [token]);
+    // Auth bypass: always set mock token and user
+    axios.defaults.headers.common['Authorization'] = `Bearer mock-token`;
+    setLoading(false);
+  }, []);
 
   const fetchUserProfile = async () => {
     try {
-      const response = await axios.get(`${API}/auth/me`);
+      const response = await axios.get(`${API}/api/auth/me`);
       setUser(response.data);
     } catch (error) {
       console.error('Failed to fetch user profile:', error);
@@ -63,59 +54,32 @@ export function AuthProvider({ children }) {
   };
 
   const login = async (email, password) => {
-    console.log('=== LOGIN ATTEMPT ===');
-    console.log('Email:', email);
-    console.log('API URL:', API);
-    
     try {
-      const formData = new FormData();
+      const formData = new URLSearchParams();
       formData.append('username', email);
       formData.append('password', password);
       
-      console.log('Making login request to:', `${API}/auth/login`);
-      
-      const response = await axios.post(`${API}/auth/login`, formData, {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
+      const response = await axios.post(`${API}/api/auth/login`, formData, {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       });
       
-      console.log('Login response:', response.data);
-      
       const { access_token } = response.data;
-      
       localStorage.setItem('token', access_token);
-      axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
       setToken(access_token);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
       
-      // Immediately fetch user profile after successful login
       await fetchUserProfile();
-      
-      console.log('Login successful!');
+      setIsAuthenticated(true);
       return true;
     } catch (error) {
-      console.error('=== LOGIN ERROR ===');
-      console.error('Error object:', error);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
-      console.error('Error message:', error.message);
-      
-      // Provide more specific error messages
-      if (error.response?.status === 401) {
-        throw new Error('Incorrect email or password. Please check your credentials and try again.');
-      } else if (error.response?.status === 422) {
-        throw new Error('Invalid email format. Please enter a valid email address.');
-      } else if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
-        throw new Error('Cannot connect to server. Please check if the backend is running.');
-      } else {
-        throw new Error(error.response?.data?.detail || error.message || 'Login failed. Please try again.');
-      }
+      console.error('Login failed:', error);
+      throw new Error(error.response?.data?.detail || 'Invalid email or password');
     }
   };
 
   const register = async (email, password, fullName) => {
     try {
-      const response = await axios.post(`${API}/auth/register`, {
+      const response = await axios.post(`${API}/api/auth/register`, {
         email,
         password,
         full_name: fullName
@@ -149,6 +113,22 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('token');
     setToken(null);
     setUser(null);
+    setIsAuthenticated(false);
+    delete axios.defaults.headers.common['Authorization'];
+    
+    // Clear all app specific data securely
+    setExpenses([]);
+    setBudgets([]);
+    setRecurringItems([]);
+    setGoals([]);
+    setGroups([]);
+    setSelectedGroup(null);
+    setGroupExpenses([]);
+    setAnalytics(null);
+    setInsights(null);
+    setUserDashboard(null);
+    setForecast(null);
+    setActiveTab('dashboard');
   };
 
   if (loading) {
@@ -156,7 +136,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, isAuthenticated: !!token }}>
+    <AuthContext.Provider value={{ user, login, register, logout, isAuthenticated: true }}>
       {children}
     </AuthContext.Provider>
   );
@@ -503,6 +483,7 @@ function App() {
   const { user, logout, isAuthenticated } = useContext(AuthContext);
   const [showRegister, setShowRegister] = useState(true); // Show register form by default
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState([]);
@@ -517,20 +498,97 @@ function App() {
     category: '',
     merchant: '',
     date: new Date().toISOString().split('T')[0],
-    notes: ''
+    notes: '',
+    original_currency: 'INR',
+    original_amount: '',
+    group_id: ''
   });
   const [receiptFile, setReceiptFile] = useState(null);
   const [processingReceipt, setProcessingReceipt] = useState(false);
   const [extractedData, setExtractedData] = useState(null);
 
+  // Multi-currency state
+  const [exchangeRates, setExchangeRates] = useState({});
+  const [selectedCurrency, setSelectedCurrency] = useState('INR');
+  const [currencyLoading, setCurrencyLoading] = useState(false);
+
+  // Group / Shared Wallet State
+  const [groups, setGroups] = useState([]);
+  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [groupExpenses, setGroupExpenses] = useState([]);
+  const [groupSettlements, setGroupSettlements] = useState([]);
+  const [groupTab, setGroupTab] = useState('transactions'); // 'transactions' | 'settlements'
+  const [loadingGroups, setLoadingGroups] = useState(false);
+  const [groupInviteCode, setGroupInviteCode] = useState('');
+  const [showAddBill, setShowAddBill] = useState(false);
+  const [groupBillForm, setGroupBillForm] = useState({ description: '', amount: '', category: 'Shared' });
+  const [newWalletName, setNewWalletName] = useState('');
+
+  const supportedCurrencies = ['INR', 'USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'SGD'];
+
+  const fetchCurrencyRates = async () => {
+    try {
+      const response = await axios.get(`${API}/api/currency/rates`);
+      setExchangeRates(response.data.rates || {});
+    } catch (error) {
+      console.error('Failed to fetch currency rates:', error);
+    }
+  };
+
+  const convertAmount = (amount, toCurrency) => {
+    if (toCurrency === 'INR' || !exchangeRates[toCurrency]) return amount;
+    return amount * exchangeRates[toCurrency];
+  };
+
+  const getCurrencySymbol = (code) => {
+    switch(code) {
+      case 'INR': return '₹';
+      case 'USD': return '$';
+      case 'EUR': return '€';
+      case 'GBP': return '£';
+      case 'JPY': return '¥';
+      default: return code;
+    }
+  };
+
   // Chat assistant state
   const [chatMessages, setChatMessages] = useState([]); // { role: 'user'|'bot', text }
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages, chatLoading]);
 
   // Expense details modal state
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [showExpenseDetails, setShowExpenseDetails] = useState(false);
+
+  // Budget state
+  const [budgets, setBudgets] = useState([]);
+  const [budgetForm, setBudgetForm] = useState({ category: '', amount: '', period: 'monthly' });
+  const [budgetLoading, setBudgetLoading] = useState(false);
+
+  // Recurring expense state
+  const [recurringItems, setRecurringItems] = useState([]);
+  const [recurringForm, setRecurringForm] = useState({
+    title: '', amount: '', category: '', frequency: 'monthly',
+    next_date: new Date().toISOString().split('T')[0], description: '', is_active: true
+  });
+  const [recurringLoading, setRecurringLoading] = useState(false);
+  const [showAddRecurring, setShowAddRecurring] = useState(false);
+  
+  // Goals state
+  const [goals, setGoals] = useState([]);
+  const [goalsLoading, setGoalsLoading] = useState(false);
+  const [showAddGoal, setShowAddGoal] = useState(false);
+  const [goalForm, setGoalForm] = useState({ title: '', target_amount: '', target_date: '', color: 'indigo', icon: '💰' });
+  const [contributionForm, setContributionForm] = useState({ goalId: null, amount: '' });
+  
+  // Forecasting state
+  const [forecast, setForecast] = useState(null);
+  const [loadingForecast, setLoadingForecast] = useState(false);
 
   // Indian expense categories
   const categories = [
@@ -581,7 +639,13 @@ function App() {
         await Promise.all([
           fetchExpenses(),
           fetchAnalytics(),
-          fetchInsights()
+          fetchInsights(),
+          fetchBudgets(),
+          fetchRecurring(),
+          fetchGoals(),
+          fetchForecast(),
+          fetchCurrencyRates(),
+          fetchGroups()
         ]);
       } catch (error) {
         console.error('Error loading initial data:', error);
@@ -603,11 +667,15 @@ function App() {
     if (activeTab === 'user-dashboard' && isAuthenticated && !userDashboard && !loadingUserDashboard) {
       fetchUserDashboard();
     }
+    if (activeTab === 'budgets' && isAuthenticated) fetchBudgets();
+    if (activeTab === 'recurring' && isAuthenticated) fetchRecurring();
+    if (activeTab === 'goals' && isAuthenticated) fetchGoals();
+    if (activeTab === 'groups' && isAuthenticated) fetchGroups();
   }, [activeTab, isAuthenticated]);
 
   const fetchExpenses = async () => {
     try {
-      const response = await axios.get(`${API}/expenses`);
+      const response = await axios.get(`${API}/api/expenses`);
       console.log('=== EXPENSES FETCH DEBUG ===');
       console.log('Raw expenses response:', response.data);
       if (response.data && response.data.length > 0) {
@@ -633,7 +701,7 @@ function App() {
 
   const fetchAnalytics = async () => {
     try {
-      const response = await axios.get(`${API}/analytics/monthly?months=6`);
+      const response = await axios.get(`${API}/api/analytics/monthly?months=6`);
       setAnalytics(response.data);
       return response.data;
     } catch (error) {
@@ -647,7 +715,7 @@ function App() {
 
   const fetchInsights = async () => {
     try {
-      const response = await axios.get(`${API}/insights`);
+      const response = await axios.get(`${API}/api/insights`);
       setInsights(response.data);
       return response.data;
     } catch (error) {
@@ -659,11 +727,171 @@ function App() {
     }
   };
 
+  const fetchBudgets = async () => {
+    try {
+      setBudgetLoading(true);
+      const res = await axios.get(`${API}/api/budgets`);
+      setBudgets(res.data);
+    } catch (e) { console.error('Failed to fetch budgets:', e); }
+    finally { setBudgetLoading(false); }
+  };
+
+  const createBudget = async (e) => {
+    e.preventDefault();
+    if (!budgetForm.category || !budgetForm.amount) return;
+    try {
+      await axios.post(`${API}/api/budgets`, {
+        category: budgetForm.category,
+        amount: parseFloat(budgetForm.amount),
+        period: budgetForm.period
+      });
+      setBudgetForm({ category: '', amount: '', period: 'monthly' });
+      await fetchBudgets();
+    } catch (e) { alert('Failed to create budget'); }
+  };
+
+  const deleteBudget = async (id) => {
+    if (!window.confirm('Delete this budget?')) return;
+    try {
+      await axios.delete(`${API}/api/budgets/${id}`);
+      await fetchBudgets();
+    } catch (e) { alert('Failed to delete budget'); }
+  };
+
+  const fetchRecurring = async () => {
+    try {
+      setRecurringLoading(true);
+      const res = await axios.get(`${API}/api/recurring`);
+      setRecurringItems(res.data);
+    } catch (e) { console.error('Failed to fetch recurring:', e); }
+    finally { setRecurringLoading(false); }
+  };
+
+  const createRecurring = async (e) => {
+    e.preventDefault();
+    if (!recurringForm.title || !recurringForm.amount || !recurringForm.category) {
+      alert("Please fill in all required fields including Category.");
+      return;
+    }
+    try {
+      await axios.post(`${API}/api/recurring`, {
+        ...recurringForm,
+        amount: parseFloat(recurringForm.amount)
+      });
+      setRecurringForm({ title: '', amount: '', category: '', frequency: 'monthly', next_date: new Date().toISOString().split('T')[0], description: '', is_active: true });
+      setShowAddRecurring(false);
+      await fetchRecurring();
+      await fetchExpenses();
+    } catch (e) { alert('Failed to create recurring expense'); }
+  };
+
+  const deleteRecurring = async (id) => {
+    if (!window.confirm('Delete this recurring expense?')) return;
+    try {
+      await axios.delete(`${API}/api/recurring/${id}`);
+      await fetchRecurring();
+    } catch (e) { alert('Failed to delete recurring expense'); }
+  };
+
+  const toggleRecurring = async (id) => {
+    try {
+      const res = await axios.patch(`${API}/api/recurring/${id}`);
+      setRecurringItems(prev => prev.map(r => r.id === id ? { ...r, is_active: res.data.is_active } : r));
+    } catch (e) { alert('Failed to toggle recurring expense'); }
+  };
+
+  const fetchGoals = async () => {
+    try {
+      setGoalsLoading(true);
+      const res = await axios.get(`${API}/api/goals`);
+      setGoals(res.data);
+    } catch (error) {
+      console.error('Failed to fetch goals:', error);
+    } finally {
+      setGoalsLoading(false);
+    }
+  };
+
+  const createGoal = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${API}/api/goals`, goalForm);
+      setGoalForm({ title: '', target_amount: '', target_date: '', color: 'indigo', icon: '💰' });
+      setShowAddGoal(false);
+      fetchGoals();
+    } catch (error) {
+      alert('Failed to create goal');
+    }
+  };
+
+  const contributeToGoal = async (e) => {
+    e.preventDefault();
+    if (!contributionForm.goalId || !contributionForm.amount) return;
+    try {
+      await axios.post(`${API}/api/goals/${contributionForm.goalId}/contribute`, { amount: contributionForm.amount });
+      setContributionForm({ goalId: null, amount: '' });
+      fetchGoals();
+      if (activeTab === 'user-dashboard') fetchUserDashboard();
+    } catch (error) {
+      alert('Failed to contribute');
+    }
+  };
+
+  const deleteGoal = async (id) => {
+    if(!window.confirm('Are you sure you want to delete this goal?')) return;
+    try {
+      await axios.delete(`${API}/api/goals/${id}`);
+      fetchGoals();
+    } catch (error) {
+      console.error('Failed to delete goal', error);
+    }
+  };
+
+  const fetchForecast = async () => {
+    try {
+      setLoadingForecast(true);
+      const res = await axios.get(`${API}/api/ai/forecast`);
+      if (res.data.success) setForecast(res.data.forecast);
+    } catch (e) { console.error('Failed to fetch forecast:', e); }
+    finally { setLoadingForecast(false); }
+  };
+
+  const exportCSV = () => {
+    const token = localStorage.getItem('token');
+    const a = document.createElement('a');
+    a.href = `${API}/api/expenses/export`;
+    a.setAttribute('download', 'rupeeflow_expenses.csv');
+    // Add auth header via fetch and create object URL
+    fetch(`${API}/api/expenses/export`, { headers: { 'Authorization': `Bearer ${token}` } })
+      .then(r => r.blob())
+      .then(blob => {
+        a.href = URL.createObjectURL(blob);
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      });
+  };
+
+  const exportPDF = () => {
+    const token = localStorage.getItem('token');
+    const a = document.createElement('a');
+    a.href = `${API}/api/expenses/pdf`;
+    a.setAttribute('download', `rupeeflow_report_${new Date().toISOString().split('T')[0]}.pdf`);
+    fetch(`${API}/api/expenses/pdf`, { headers: { 'Authorization': `Bearer ${token}` } })
+      .then(r => r.blob())
+      .then(blob => {
+        a.href = URL.createObjectURL(blob);
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      });
+  };
+
   const fetchUserDashboard = async () => {
     try {
       setLoadingUserDashboard(true);
       console.log('Fetching user dashboard data...');
-      const response = await axios.get(`${API}/user/dashboard`);
+      const response = await axios.get(`${API}/api/user/dashboard`);
       console.log('User dashboard response:', response.data);
       setUserDashboard(response.data);
       return response.data;
@@ -682,15 +910,31 @@ function App() {
     e.preventDefault();
     try {
       setLoading(true);
-      await axios.post(`${API}/expenses`, {
-        title: expenseForm.description, // Backend expects 'title' field
+      
+      const payload = {
         amount: parseFloat(expenseForm.amount),
-        date: expenseForm.date,
-        category: expenseForm.category || 'Other',
         description: expenseForm.description,
-        receipt_url: null,
-        user_id: '' // This will be set by the backend
-      });
+        category: expenseForm.category || 'Other',
+        date: expenseForm.date,
+        merchant: expenseForm.merchant,
+        notes: expenseForm.notes,
+        original_currency: expenseForm.original_currency || 'INR',
+        original_amount: expenseForm.amount
+      };
+
+      if (expenseForm.group_id) {
+        // Post to shared wallet
+        await axios.post(`${API}/groups/${expenseForm.group_id}/expenses`, payload);
+        await fetchGroupExpenses(expenseForm.group_id);
+        setActiveTab('groups');
+      } else {
+        // Post to personal account
+        await axios.post(`${API}/api/expenses`, {
+          ...payload,
+          title: expenseForm.description // Legacy field name for backward compatibility
+        });
+        setActiveTab('expenses');
+      }
       
       // Reset form
       setExpenseForm({
@@ -699,25 +943,23 @@ function App() {
         category: '',
         merchant: '',
         date: new Date().toISOString().split('T')[0],
-        notes: ''
+        notes: '',
+        original_currency: 'INR',
+        original_amount: '',
+        group_id: ''
       });
       
-      // Refresh data including user dashboard
+      // Refresh personal data
       await Promise.all([
         fetchExpenses(),
         fetchAnalytics(),
-        fetchInsights()
+        fetchInsights(),
+        fetchUserDashboard()
       ]);
       
-      // Refresh user dashboard if it was loaded
-      if (userDashboard) {
-        await fetchUserDashboard();
-      }
-      
-      setActiveTab('expenses');
     } catch (error) {
       console.error('Failed to create expense:', error);
-      alert('Failed to create expense. Please try again.');
+      alert('Failed to create expense. ' + (error.response?.data?.detail || 'Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -735,7 +977,7 @@ function App() {
       const formData = new FormData();
       formData.append('file', receiptFile);
       
-      const response = await axios.post(`${API}/expenses/receipt`, formData, {
+      const response = await axios.post(`${API}/api/expenses/receipt`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
@@ -800,11 +1042,11 @@ function App() {
     
     console.log('=== DELETE EXPENSE DEBUG ===');
     console.log('Attempting to delete expense ID:', expenseId);
-    console.log('API URL:', `${API}/expenses/${expenseId}`);
+    console.log('API URL:', `${API}/api/expenses/${expenseId}`);
     console.log('Current expenses count:', (expenses || []).length);
     
     try {
-      const response = await axios.delete(`${API}/expenses/${expenseId}`);
+      const response = await axios.delete(`${API}/api/expenses/${expenseId}`);
       console.log('Delete response:', response.data);
       
       // Refresh data after successful deletion including user dashboard
@@ -865,18 +1107,127 @@ function App() {
       // append user message
       setChatMessages(prev => [...prev, { role: 'user', text: question }]);
 
-      // Simple client-side expense analysis
-      const response = analyzeExpenseQuestion(question);
-      
-      // append bot message with optional structured data
-      setChatMessages(prev => [...prev, { role: 'bot', text: response.answer, data: response.data || null }]);
-      return response;
+      // Try advanced AI assistant first
+      try {
+        const response = await axios.post(`${API}/api/ai-assistant/chat`, {
+          query: question
+        });
+        
+        const aiResponse = response.data;
+        // append bot message with AI response and structured data
+        setChatMessages(prev => [...prev, { 
+          role: 'bot', 
+          text: aiResponse.answer, 
+          data: aiResponse.data || null,
+          isAI: aiResponse.is_ai_response || false
+        }]);
+        return aiResponse;
+      } catch (aiError) {
+        console.log('AI assistant failed, falling back to basic analysis:', aiError);
+        
+        // Fallback to simple client-side expense analysis
+        const response = analyzeExpenseQuestion(question);
+        
+        // append bot message with optional structured data
+        setChatMessages(prev => [...prev, { 
+          role: 'bot', 
+          text: response.answer, 
+          data: response.data || null,
+          isAI: false
+        }]);
+        return response;
+      }
     } catch (err) {
       console.error('Chat error:', err);
       setChatMessages(prev => [...prev, { role: 'bot', text: 'Sorry, I encountered an error. Please try again.' }]);
       throw err;
     } finally {
       setChatLoading(false);
+    }
+  };
+
+  const fetchGroups = async () => {
+    try {
+      setLoadingGroups(true);
+      const response = await axios.get(`${API}/api/groups`);
+      setGroups(response.data);
+    } catch (error) {
+      console.error('Failed to fetch groups:', error);
+      setGroups([]);
+    } finally {
+      setLoadingGroups(false);
+    }
+  };
+
+  const createGroup = async (name, description) => {
+    try {
+      const response = await axios.post(`${API}/api/groups`, { name, description });
+      await fetchGroups();
+      setSelectedGroup(response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Create group failed:', error);
+      alert('Failed to create group: ' + (error.response?.data?.detail || error.message));
+    }
+  };
+
+  const joinGroup = async (code) => {
+    if (!code.trim()) return;
+    try {
+      const response = await axios.post(`${API}/api/groups/join`, { invite_code: code.trim() });
+      await fetchGroups();
+      setGroupInviteCode('');
+      setSelectedGroup(response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Join group failed:', error);
+      alert(error.response?.data?.detail || 'Invalid invite code. Please try again.');
+    }
+  };
+
+  const fetchGroupExpenses = async (groupId) => {
+    try {
+      const [expensesRes, settlementsRes] = await Promise.all([
+        axios.get(`${API}/api/groups/${groupId}/expenses`),
+        axios.get(`${API}/api/groups/${groupId}/settlements`)
+      ]);
+      setGroupExpenses(expensesRes.data);
+      setGroupSettlements(settlementsRes.data);
+    } catch (error) {
+      console.error('Failed to fetch group expenses/settlements:', error);
+      setGroupExpenses([]);
+      setGroupSettlements([]);
+    }
+  };
+
+  const submitGroupBill = async (e) => {
+    e.preventDefault();
+    if (!groupBillForm.description || !groupBillForm.amount || !selectedGroup) return;
+    try {
+      await axios.post(`${API}/api/groups/${selectedGroup.id}/expenses`, {
+        // Required fields for ExpenseCreate schema
+        title: groupBillForm.description,
+        user_id: user?.id || 'dev-user',
+        // Form fields
+        amount: parseFloat(groupBillForm.amount),
+        description: groupBillForm.description,
+        category: groupBillForm.category || 'Shared',
+        date: new Date().toISOString().split('T')[0],
+        original_currency: 'INR',
+        original_amount: parseFloat(groupBillForm.amount),
+        exchange_rate: 1.0,
+      });
+      setGroupBillForm({ description: '', amount: '', category: 'Shared' });
+      setShowAddBill(false);
+      await fetchGroupExpenses(selectedGroup.id);
+    } catch (error) {
+      console.error('Failed to add group bill:', error);
+      // Show detailed validation error if available
+      const detail = error.response?.data?.detail;
+      const msg = Array.isArray(detail)
+        ? detail.map(d => `${d.loc?.join('.')}: ${d.msg}`).join('\n')
+        : (detail || error.message);
+      alert('Failed to add bill:\n' + msg);
     }
   };
 
@@ -1093,11 +1444,21 @@ function App() {
     };
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-IN', {
+  const formatCurrency = (amount, currencyCode = selectedCurrency) => {
+    // If we're formatting for a specific currency, we MUST convert the base (INR) amount first
+    const converted = convertAmount(amount, currencyCode);
+    
+    let locale = 'en-IN';
+    if (currencyCode === 'USD' || currencyCode === 'CAD' || currencyCode === 'AUD') locale = 'en-US';
+    if (currencyCode === 'EUR') locale = 'de-DE';
+    if (currencyCode === 'GBP') locale = 'en-GB';
+    if (currencyCode === 'JPY') locale = 'ja-JP';
+
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
-      currency: 'INR'
-    }).format(amount);
+      currency: currencyCode,
+      minimumFractionDigits: currencyCode === 'JPY' ? 0 : 2
+    }).format(converted);
   };
 
   const getTotalExpenses = () => {
@@ -1132,31 +1493,41 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-slate-700 rounded-md flex items-center justify-center shadow-sm">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              </div>
-              <div>
-                <h1 className="text-xl font-semibold text-gray-900 tracking-tight">RupeeFlow</h1>
-                <p className="text-sm text-gray-500 font-medium">Your intelligent expense companion</p>
-              </div>
-            </div>
+    <div className="flex h-screen bg-gray-50 overflow-hidden font-sans antialiased">
+      {/* Left Sidebar — Neo-brutalism */}
+      <aside
+        className={`hidden lg:flex flex-col flex-shrink-0 bg-white border-r-2 border-black transition-[width] duration-300 ease-in-out overflow-hidden ${
+          sidebarOpen ? 'w-64' : 'w-0 border-r-0'
+        }`}
+      >
+        {/* Logo */}
+        <div className="h-16 flex items-center px-5 border-b-2 border-black flex-shrink-0 bg-black min-w-[256px]">
+          <div className="w-10 h-10 flex-shrink-0 mr-3 overflow-hidden">
+            <img
+              src="/logo.png"
+              alt="RupeeFlow Logo"
+              className="w-full h-full object-cover"
+            />
           </div>
+          <div className="flex-1">
+            <h1 className="text-base font-black text-white tracking-tight leading-tight uppercase">RupeeFlow</h1>
+            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Expense Tracker</p>
+          </div>
+          {/* Close Button */}
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="ml-2 w-7 h-7 flex items-center justify-center bg-white/10 hover:bg-yellow-300 hover:text-black text-white transition-colors duration-150 flex-shrink-0"
+            title="Close sidebar"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
         </div>
-      </header>
 
-      {/* Navigation */}
-      <nav className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-8 overflow-x-auto">
-            {[
+        {/* Nav Items */}
+        <div className="flex-1 overflow-y-auto py-3 no-scrollbar">
+          {[
               { 
                 id: 'user-dashboard', 
                 name: 'Profile', 
@@ -1178,166 +1549,319 @@ function App() {
                 icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
               },
               { 
+                id: 'groups', 
+                name: 'Shared Wallets', 
+                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+              },
+              { 
                 id: 'assistant', 
                 name: 'Assistant', 
                 icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
               },
               { 
-                id: 'expenses', 
-                name: 'All Expenses', 
-                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
-              },
-              { 
                 id: 'analytics', 
                 name: 'Analytics', 
                 icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+              },
+              { 
+                id: 'budgets', 
+                name: 'Budgets', 
+                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" /></svg>
+              },
+              { 
+                id: 'recurring', 
+                name: 'Recurring', 
+                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+              },
+              { 
+                id: 'goals', 
+                name: 'Goals', 
+                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>
+              },
+              { 
+                id: 'predictions', 
+                name: 'Predictions', 
+                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
               }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`w-full flex items-center space-x-3 px-4 py-2.5 font-black text-[11px] uppercase tracking-widest transition-all duration-150 relative ${
+                activeTab === tab.id
+                  ? 'bg-black text-yellow-300 border-l-4 border-yellow-300 pl-3'
+                  : 'text-gray-500 hover:bg-gray-100 hover:text-black border-l-4 border-transparent'
+              }`}
+            >
+              <div className={activeTab === tab.id ? 'text-yellow-300' : 'text-gray-400'}>{tab.icon}</div>
+              <span>{tab.name}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Sign Out */}
+        <div className="p-4 border-t-2 border-black">
+          <button onClick={logout} className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 bg-white text-black border-2 border-black font-black text-[10px] uppercase tracking-widest hover:bg-red-600 hover:text-white hover:border-red-600 transition-colors shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:shadow-none">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+            <span>Sign Out</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Workspace */}
+      <div className="flex-1 flex flex-col h-screen overflow-hidden bg-gray-50 relative">
+        {/* Floating sidebar open button — shown when sidebar is closed */}
+        {!sidebarOpen && (
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="hidden lg:flex fixed top-3 left-3 z-50 w-10 h-10 bg-black text-yellow-300 border-2 border-black items-center justify-center shadow-[3px_3px_0_0_rgba(0,0,0,0.3)] hover:bg-yellow-300 hover:text-black transition-colors duration-150"
+            title="Open sidebar"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        )}
+        <header className="lg:hidden bg-white shadow-sm border-b border-gray-200 z-10 p-2">
+          <div className="flex space-x-4 overflow-x-auto no-scrollbar items-center pb-1 px-2">
+            {[
+              { id: 'user-dashboard', name: 'Profile' },
+              { id: 'dashboard', name: 'Dashboard' },
+              { id: 'add-expense', name: 'Add Expense' },
+              { id: 'receipt-scan', name: 'Scan Receipt' },
+              { id: 'groups', name: 'Wallets' },
+              { id: 'assistant', name: 'Assistant' },
+              { id: 'analytics', name: 'Analytics' },
+              { id: 'budgets', name: 'Budgets' },
+              { id: 'recurring', name: 'Recurring' },
+              { id: 'goals', name: 'Goals' },
+              { id: 'predictions', name: 'Predictions' }
             ].map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 whitespace-nowrap flex items-center space-x-2 ${
-                  activeTab === tab.id
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                className={`flex-shrink-0 px-4 py-2 rounded-full font-bold text-[10px] uppercase tracking-widest transition-colors ${
+                  activeTab === tab.id ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'
                 }`}
               >
-                {tab.icon}
-                <span>{tab.name}</span>
+                {tab.name}
               </button>
             ))}
           </div>
-        </div>
-      </nav>
+        </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'dashboard' && (
-          <div className="space-y-6">
-            {/* Dashboard Header */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center space-x-4">
-                <div className="w-16 h-16 bg-slate-700 rounded-md flex items-center justify-center shadow-lg">
-                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-8 w-full max-w-7xl mx-auto pb-40">
+          {activeTab === 'dashboard' && (
+            <div className="space-y-6 animate-[slideDown_0.3s_ease-out]">
+              <div className="bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center space-x-4">
+                <div className="w-14 h-14 bg-black border-2 border-black flex items-center justify-center shadow-[3px_3px_0_0_rgba(99,102,241,1)]">
+                  <svg className="w-8 h-8 text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                   </svg>
                 </div>
                 <div>
-                  <h2 className="text-2xl font-semibold text-gray-900">Dashboard Overview</h2>
-                  <p className="text-gray-600">Comprehensive view of your expense tracking</p>
+                  <h2 className="text-xl font-black text-black uppercase tracking-tight">Financial Insights</h2>
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Real-time analysis in {selectedCurrency}</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-1 bg-gray-100 p-1.5 border-2 border-black">
+                {supportedCurrencies.slice(0, 5).map(c => (
+                  <button
+                    key={c}
+                    onClick={() => setSelectedCurrency(c)}
+                    className={`px-3 py-1.5 text-xs font-black transition-all duration-150 border-2 ${
+                      selectedCurrency === c 
+                      ? 'bg-black text-yellow-300 border-black shadow-[2px_2px_0_0_rgba(99,102,241,1)]' 
+                      : 'text-gray-500 border-transparent hover:border-black hover:bg-white'
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Expense Statistics — Neo-brutalism */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] p-6 hover:shadow-[6px_6px_0_0_rgba(0,0,0,1)] hover:-translate-y-0.5 transition-all duration-150">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Total Expenses</p>
+                    <p className="text-3xl font-black text-black">{(expenses || []).length}</p>
+                    <p className="text-xs font-bold text-gray-400 mt-1 uppercase tracking-tight">All time transactions</p>
+                  </div>
+                  <div className="w-12 h-12 bg-yellow-300 border-2 border-black flex items-center justify-center shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                    <svg className="w-5 h-5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 8l2 2 4-4" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-black border-2 border-black shadow-[4px_4px_0_0_rgba(99,102,241,1)] p-6 hover:shadow-[6px_6px_0_0_rgba(99,102,241,1)] hover:-translate-y-0.5 transition-all duration-150">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Amount</p>
+                    <p className="text-3xl font-black text-white">
+                      {formatCurrency(getTotalExpenses())}
+                    </p>
+                    <p className="text-[10px] text-gray-500 mt-1 uppercase font-bold tracking-tight">
+                      Converted from INR
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 bg-indigo-500 border-2 border-indigo-300 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] p-6 hover:shadow-[6px_6px_0_0_rgba(0,0,0,1)] hover:-translate-y-0.5 transition-all duration-150">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Active Categories</p>
+                    <p className="text-3xl font-black text-black">
+                      {Object.keys(getCategoryTotals()).length}
+                    </p>
+                    <p className="text-xs font-bold text-gray-400 mt-1 uppercase tracking-tight">Expense categories used</p>
+                  </div>
+                  <div className="w-12 h-12 bg-green-400 border-2 border-black flex items-center justify-center shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                    <svg className="w-5 h-5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Expense Statistics */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Total Expenses</p>
-                    <p className="text-2xl font-semibold text-gray-900">{(expenses || []).length}</p>
-                    <p className="text-sm text-gray-500 mt-1">All time transactions</p>
-                  </div>
-                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 8l2 2 4-4" />
-                    </svg>
-                  </div>
-                </div>
+            {/* Shared Wallets Summary Widget */}
+            <div className="bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] overflow-hidden">
+              <div className="bg-black px-6 py-4 flex items-center justify-between">
+                <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-widest">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                  My Shared Wallets
+                </h3>
+                <button 
+                   onClick={() => setActiveTab('groups')}
+                   className="text-[10px] font-black text-yellow-300 hover:text-white uppercase tracking-tighter transition-colors border border-yellow-300 hover:border-white px-2 py-1"
+                >
+                  Manage All →
+                </button>
               </div>
-              
-              <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Total Amount</p>
-                    <p className="text-2xl font-semibold text-gray-900">
-                      {formatCurrency(getTotalExpenses())}
-                    </p>
-                    <p className="text-sm text-gray-500 mt-1">Current spending total</p>
+              <div className="p-6">
+                {(groups || []).length === 0 ? (
+                  <div className="text-center py-6">
+                     <p className="text-xs text-gray-500 font-medium italic">No active shared wallets. Split bills effortlessly by creating one!</p>
+                <button 
+                        onClick={() => setActiveTab('groups')}
+                        className="mt-3 px-4 py-2 bg-yellow-300 text-black border-2 border-black text-[10px] font-black uppercase tracking-widest hover:bg-yellow-400 transition-colors shadow-[2px_2px_0_0_rgba(0,0,0,1)]"
+                     >
+                       + Create Wallet
+                     </button>
                   </div>
-                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                    </svg>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {(groups || []).slice(0, 3).map(group => (
+                      <div key={group.id} className="p-4 bg-gray-50 border-2 border-black flex items-center justify-between shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                         <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-yellow-300 border-2 border-black flex items-center justify-center font-black text-xs text-black">
+                               {group.name?.substring(0, 2).toUpperCase() || 'SW'}
+                            </div>
+                            <div>
+                               <p className="text-sm font-black text-gray-900">{group.name}</p>
+                               <p className="text-[10px] text-gray-500 font-bold uppercase">{(group.members || []).length} members</p>
+                            </div>
+                         </div>
+                         <div className="text-right">
+                            <p className="text-[10px] text-gray-400 font-black uppercase tracking-tighter">Code</p>
+                            <p className="text-xs font-black text-indigo-600 select-all cursor-pointer">{group.invite_code}</p>
+                         </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              </div>
-              
-              <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Active Categories</p>
-                    <p className="text-2xl font-semibold text-gray-900">
-                      {Object.keys(getCategoryTotals()).length}
-                    </p>
-                    <p className="text-sm text-gray-500 mt-1">Expense categories used</p>
-                  </div>
-                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                    </svg>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
 
             {/* Category Breakdown */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-medium text-gray-900">Category Breakdown</h3>
+            <div className="bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+              <div className="px-6 py-4 border-b-2 border-black flex items-center gap-3">
+                <div className="w-8 h-8 bg-indigo-500 border-2 border-black flex items-center justify-center">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" /></svg>
+                </div>
+                <h3 className="text-sm font-black text-black uppercase tracking-widest">Spending by Category</h3>
               </div>
               <div className="p-6">
-                <div className="space-y-4">
-                  {Object.entries(getCategoryTotals()).sort(([,a], [,b]) => b - a).slice(0, 6).map(([category, total], index) => {
-                    const percentage = (total / getTotalExpenses()) * 100;
-                    return (
-                      <div key={index} className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
-                            <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                            </svg>
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-900">{category}</p>
-                            <div className="w-32 bg-gray-200 rounded-full h-2 mt-1">
-                              <div
-                                className="bg-blue-600 h-2 rounded-full"
-                                style={{ width: `${percentage}%` }}
-                              ></div>
-                            </div>
-                          </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                  <div className="h-[250px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={Object.entries(getCategoryTotals()).sort(([,a], [,b]) => b - a).map(([name, value]) => ({ name, value }))}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={5}
+                          dataKey="value"
+                          stroke="#000"
+                          strokeWidth={2}
+                        >
+                          {Object.entries(getCategoryTotals()).map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={[
+                              '#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', 
+                              '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#6366f1'
+                            ][index % 10]} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          formatter={(value) => [formatCurrency(value), 'Total']}
+                          contentStyle={{ borderRadius: '0', border: '2px solid black', boxShadow: '4px 4px 0 0 rgba(0,0,0,1)' }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="space-y-2">
+                    {Object.entries(getCategoryTotals()).sort(([,a], [,b]) => b - a).slice(0, 5).map(([category, total], index) => (
+                      <div key={index} className="flex items-center justify-between p-2 hover:bg-yellow-50 border border-transparent hover:border-black transition-all">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-3 h-3 border border-black" style={{ backgroundColor: [
+                            '#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', 
+                            '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#6366f1'
+                          ][index % 10] }}></div>
+                          <span className="text-xs font-bold text-gray-700">{category}</span>
                         </div>
-                        <div className="text-right">
-                          <p className="text-sm font-medium text-gray-900">
-                            {formatCurrency(total)}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {percentage.toFixed(1)}%
-                          </p>
-                        </div>
+                        <span className="text-xs font-black text-black">{formatCurrency(total)}</span>
                       </div>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Recent Expenses */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-medium text-gray-900">Recent Expenses</h3>
+            <div className="bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+              <div className="px-6 py-4 border-b-2 border-black flex items-center gap-3">
+                <div className="w-8 h-8 bg-green-400 border-2 border-black flex items-center justify-center">
+                  <svg className="w-4 h-4 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-sm font-black text-black uppercase tracking-widest">Recent Expenses</h3>
               </div>
-              <div className="divide-y divide-gray-200">
+              <div className="divide-y-2 divide-black">
                 {(expenses || []).slice(0, 5).map(expense => (
                   <div 
                     key={expense.id} 
-                    className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 cursor-pointer transition-colors duration-200"
+                    className="px-6 py-4 flex items-center justify-between hover:bg-yellow-50 cursor-pointer transition-colors duration-150"
                     onClick={() => openExpenseDetails(expense)}
                     title="Click to view full details"
                   >
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gray-100 border-2 border-black flex items-center justify-center">
                         <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           {expense.category === 'Food & Dining' ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /> :
                            expense.category === 'Groceries & Household' ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.35 2.65a1 1 0 00.7 1.71h11.65M7 13v6a2 2 0 002 2h6a2 2 0 002-2v-6m-8 0V9a2 2 0 012-2h4a2 2 0 012 2v4.01" /> :
@@ -1358,19 +1882,26 @@ function App() {
                         </svg>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{expense.description}</p>
-                        <p className="text-sm text-gray-500">{expense.category} • {expense.date}</p>
+                        <div className="flex items-center">
+                          <p className="text-sm font-black text-black">{expense.description}</p>
+                          {expense.is_anomaly && (
+                            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white animate-pulse">
+                              ANOMALY
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-tight">{expense.category} · {expense.date}</p>
                         {expense.items && expense.items.length > 0 && (
                           <p className="text-xs text-gray-600 mt-1">📦 {expense.items.length} items</p>
                         )}
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-medium text-gray-900">
+                      <p className="text-sm font-black text-black">
                         {formatCurrency(expense.amount)}
                       </p>
                       {expense.ai_categorized && (
-                        <p className="text-xs text-blue-600">AI categorized</p>
+                        <p className="text-[10px] font-black text-indigo-600 uppercase">AI categorized</p>
                       )}
                     </div>
                   </div>
@@ -1380,19 +1911,22 @@ function App() {
 
             {/* AI Insights */}
             {insights && insights.length > 0 && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <h3 className="text-lg font-medium text-gray-900">💡 AI Insights</h3>
+              <div className="bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+                <div className="px-6 py-4 border-b-2 border-black flex items-center gap-3">
+                  <div className="w-8 h-8 bg-yellow-300 border-2 border-black flex items-center justify-center">
+                    <span className="text-sm">💡</span>
+                  </div>
+                  <h3 className="text-sm font-black text-black uppercase tracking-widest">AI Insights</h3>
                 </div>
-                <div className="p-6 space-y-4">
+                <div className="p-6 space-y-3">
                   {(insights || []).map((insight, index) => (
-                    <div key={index} className={`p-4 rounded-lg border transition-colors duration-200 hover:shadow-sm ${
-                      insight.type === 'overspending' ? 'bg-red-50 border-red-200' :
-                      insight.type === 'suggestion' ? 'bg-green-50 border-green-200' :
-                      'bg-blue-50 border-blue-200'
+                    <div key={index} className={`p-4 border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] ${
+                      insight.type === 'overspending' ? 'bg-red-50' :
+                      insight.type === 'suggestion' ? 'bg-green-50' :
+                      'bg-blue-50'
                     }`}>
-                      <h4 className="font-medium text-gray-900">{insight.title}</h4>
-                      <p className="text-sm text-gray-600 mt-1">{insight.description}</p>
+                      <h4 className="font-black text-black text-sm">{insight.title}</h4>
+                      <p className="text-xs font-medium text-gray-600 mt-1">{insight.description}</p>
                     </div>
                   ))}
                 </div>
@@ -1413,24 +1947,24 @@ function App() {
             ) : userDashboard ? (
               <>
                 {/* User Profile Card */}
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div className="bg-black border-2 border-black shadow-[4px_4px_0_0_rgba(99,102,241,1)] p-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-6">
-                      <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
-                        <span className="text-3xl text-white font-bold">
+                      <div className="w-20 h-20 bg-yellow-300 border-2 border-yellow-300 flex items-center justify-center shadow-[3px_3px_0_0_rgba(99,102,241,1)]">
+                        <span className="text-3xl text-black font-black">
                           {userDashboard?.user_info?.full_name ? userDashboard.user_info.full_name.charAt(0).toUpperCase() : '👤'}
                         </span>
                       </div>
                       <div className="flex-1">
-                        <h2 className="text-2xl font-bold text-gray-900">{userDashboard?.user_info?.full_name || 'User'}</h2>
-                        <p className="text-gray-600">{userDashboard?.user_info?.email || 'No email'}</p>
-                        <p className="text-sm text-gray-500 mt-1">Member since {userDashboard?.account_info?.member_since ? new Date(userDashboard.account_info.member_since).toLocaleDateString() : 'N/A'}</p>
+                        <h2 className="text-2xl font-black text-white uppercase tracking-tight">{userDashboard?.user_info?.full_name || 'User'}</h2>
+                        <p className="text-gray-400 font-bold text-sm">{userDashboard?.user_info?.email || 'No email'}</p>
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Member since {userDashboard?.account_info?.member_since ? new Date(userDashboard.account_info.member_since).toLocaleDateString() : 'N/A'}</p>
                       </div>
                     </div>
                     <div className="flex flex-col space-y-2">
                       <button
                         onClick={logout}
-                        className="px-4 py-2 text-sm text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 transition-colors"
+                        className="px-4 py-2 text-sm font-black text-black bg-red-400 border-2 border-red-400 hover:bg-red-300 transition-colors shadow-[2px_2px_0_0_rgba(255,255,255,0.3)] uppercase tracking-widest"
                       >
                         Logout
                       </button>
@@ -1440,72 +1974,75 @@ function App() {
 
                 {/* Expense Statistics */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+                  <div className="bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] p-6 hover:-translate-y-0.5 transition-all duration-150">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-gray-600">Total Spent</p>
-                        <p className="text-2xl font-bold text-gray-900">
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Total Spent</p>
+                        <p className="text-2xl font-black text-black">
                           {formatCurrency(userDashboard?.expense_statistics?.total_spent || 0)}
                         </p>
                       </div>
-                      <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                        <span className="text-2xl">💰</span>
+                      <div className="w-12 h-12 bg-red-400 border-2 border-black flex items-center justify-center shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                        <span className="text-xl">💰</span>
                       </div>
                     </div>
                   </div>
                   
-                  <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+                  <div className="bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] p-6 hover:-translate-y-0.5 transition-all duration-150">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-gray-600">Total Expenses</p>
-                        <p className="text-2xl font-bold text-gray-900">
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Total Expenses</p>
+                        <p className="text-2xl font-black text-black">
                           {userDashboard?.expense_statistics?.total_transactions || 0}
                         </p>
                       </div>
-                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <span className="text-2xl">📝</span>
+                      <div className="w-12 h-12 bg-blue-400 border-2 border-black flex items-center justify-center shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                        <span className="text-xl">📝</span>
                       </div>
                     </div>
                   </div>
                   
-                  <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+                  <div className="bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] p-6 hover:-translate-y-0.5 transition-all duration-150">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-gray-600">Average per Expense</p>
-                        <p className="text-2xl font-bold text-gray-900">
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Avg per Expense</p>
+                        <p className="text-2xl font-black text-black">
                           {formatCurrency(userDashboard?.expense_statistics?.average_per_transaction || 0)}
                         </p>
                       </div>
-                      <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                        <span className="text-2xl">📊</span>
+                      <div className="w-12 h-12 bg-green-400 border-2 border-black flex items-center justify-center shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                        <span className="text-xl">📊</span>
                       </div>
                     </div>
                   </div>
                   
-                  <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+                  <div className="bg-black border-2 border-black shadow-[4px_4px_0_0_rgba(99,102,241,1)] p-6 hover:-translate-y-0.5 transition-all duration-150">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-gray-600">Monthly Average</p>
-                        <p className="text-2xl font-bold text-gray-900">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Monthly Average</p>
+                        <p className="text-2xl font-black text-white">
                           {formatCurrency((userDashboard?.expense_statistics?.total_spent || 0) / Math.max((userDashboard?.monthly_trend || []).length, 1))}
                         </p>
                       </div>
-                      <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                        <span className="text-2xl">📅</span>
+                      <div className="w-12 h-12 bg-indigo-500 border-2 border-indigo-300 flex items-center justify-center">
+                        <span className="text-xl">📅</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Category Breakdown */}
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                  <div className="px-6 py-4 border-b border-gray-200">
-                    <h3 className="text-lg font-medium text-gray-900">Category Breakdown</h3>
+                <div className="bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+                  <div className="px-6 py-4 border-b-2 border-black flex items-center gap-3">
+                    <div className="w-8 h-8 bg-indigo-500 border-2 border-black flex items-center justify-center">
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" /></svg>
+                    </div>
+                    <h3 className="text-sm font-black text-black uppercase tracking-widest">Category Breakdown</h3>
                   </div>
                   <div className="p-6">
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       {(userDashboard?.category_breakdown || []).map((category, index) => (
-                        <div key={index} className="flex items-center justify-between">
+                        <div key={index} className="flex items-center justify-between p-2 hover:bg-yellow-50 border border-transparent hover:border-black transition-all">
                           <div className="flex items-center space-x-3">
                             <span className="text-lg">
                               {category.category === 'Food & Dining' ? '🍽️' :
@@ -1525,20 +2062,20 @@ function App() {
                                category.category === 'Investments & SIP' ? '📈' : '💼'}
                             </span>
                             <div className="flex-1">
-                              <p className="text-sm font-medium text-gray-900">{category.category}</p>
-                              <div className="w-48 bg-gray-200 rounded-full h-2 mt-1">
+                              <p className="text-sm font-black text-black">{category.category}</p>
+                              <div className="w-48 bg-gray-200 h-2 mt-1 border border-gray-300">
                                 <div
-                                  className="bg-indigo-600 h-2 rounded-full"
+                                  className="bg-black h-2"
                                   style={{ width: `${category.percentage}%` }}
                                 ></div>
                               </div>
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="text-sm font-medium text-gray-900">
+                            <p className="text-sm font-black text-black">
                               {formatCurrency(category.total)}
                             </p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs font-bold text-gray-500 uppercase">
                               {category.percentage.toFixed(1)}%
                             </p>
                           </div>
@@ -1549,20 +2086,25 @@ function App() {
                 </div>
 
                 {/* Recent Expenses */}
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                  <div className="px-6 py-4 border-b border-gray-200">
-                    <h3 className="text-lg font-medium text-gray-900">Recent Expenses</h3>
+                <div className="bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+                  <div className="px-6 py-4 border-b-2 border-black flex items-center gap-3">
+                    <div className="w-8 h-8 bg-green-400 border-2 border-black flex items-center justify-center">
+                      <svg className="w-4 h-4 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-sm font-black text-black uppercase tracking-widest">Recent Expenses</h3>
                   </div>
-                  <div className="divide-y divide-gray-200">
+                  <div className="divide-y-2 divide-black">
                     {(userDashboard?.recent_expenses || []).map(expense => (
                       <div 
                         key={expense.id} 
-                        className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 cursor-pointer transition-colors"
+                        className="px-6 py-4 flex items-center justify-between hover:bg-yellow-50 cursor-pointer transition-colors"
                         onClick={() => openExpenseDetails(expense)}
                         title="Click to view full details"
                       >
                         <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                          <div className="w-10 h-10 bg-gray-100 border-2 border-black flex items-center justify-center">
                             <span className="text-lg">
                               {expense.category === 'Food & Dining' ? '🍽️' :
                                expense.category === 'Groceries & Household' ? '🛒' :
@@ -1582,12 +2124,12 @@ function App() {
                             </span>
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-gray-900">{expense.description}</p>
-                            <p className="text-sm text-gray-500">{expense.category} • {expense.date}</p>
+                            <p className="text-sm font-black text-black">{expense.description}</p>
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-tight">{expense.category} · {expense.date}</p>
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-medium text-gray-900">
+                          <p className="text-sm font-black text-black">
                             {formatCurrency(expense.amount)}
                           </p>
                         </div>
@@ -1596,41 +2138,63 @@ function App() {
                   </div>
                 </div>
 
-                {/* Monthly Trends */}
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                  <div className="px-6 py-4 border-b border-gray-200">
-                    <h3 className="text-lg font-medium text-gray-900">Monthly Spending Trends</h3>
-                  </div>
-                  <div className="p-6">
-                    <div className="space-y-4">
-                      {(userDashboard?.monthly_trend || []).map((month, index) => (
-                        <div key={index} className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <span className="text-sm font-medium text-gray-900 w-24">
-                              {new Date(month.month + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                            </span>
-                            <div className="flex-1">
-                              <div className="w-48 bg-gray-200 rounded-full h-3">
-                                <div
-                                  className="bg-gradient-to-r from-blue-500 to-indigo-600 h-3 rounded-full"
-                                  style={{ width: `${Math.min(month.total / Math.max(...(userDashboard?.monthly_trend || []).map(m => m.total || 0), 1) * 100, 100)}%` }}
-                                ></div>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm font-medium text-gray-900">
-                              {formatCurrency(month.total)}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {month.count} expenses
-                            </p>
-                          </div>
+                  {/* Monthly Trends */}
+                  <div className="bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] overflow-hidden">
+                    <div className="px-6 py-4 border-b-2 border-black flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-yellow-300 border-2 border-black flex items-center justify-center text-sm">📈</div>
+                        <h3 className="text-sm font-black text-black uppercase tracking-widest">Monthly Trends</h3>
+                      </div>
+                      {userDashboard?.monthly_trend?.length > 0 && (
+                        <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest border border-black px-2 py-0.5">
+                          {userDashboard.monthly_trend.length} month{userDashboard.monthly_trend.length !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </div>
+                    <div className="p-6">
+                      {(!userDashboard?.monthly_trend || userDashboard.monthly_trend.length === 0) ? (
+                        <div className="h-64 flex flex-col items-center justify-center gap-2">
+                          <span className="text-4xl">📊</span>
+                          <p className="text-sm font-bold text-gray-400">No data yet — add expenses to see trends</p>
                         </div>
-                      ))}
+                      ) : (
+                        <div className="h-64 w-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <ComposedChart data={userDashboard.monthly_trend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} barCategoryGap="35%">
+                              <defs>
+                                <linearGradient id="barGradDash" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="#6366f1" stopOpacity={1}/>
+                                  <stop offset="100%" stopColor="#4338ca" stopOpacity={0.8}/>
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                              <XAxis
+                                dataKey="month"
+                                tickFormatter={m => { try { return new Date(m+'-01').toLocaleDateString('en-US',{month:'short',year:'2-digit'}); } catch(e){return m;} }}
+                                axisLine={false} tickLine={false}
+                                tick={{ fontSize: 11, fontWeight: 700, fill: '#94a3b8' }}
+                              />
+                              <YAxis
+                                axisLine={false} tickLine={false}
+                                tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }}
+                                tickFormatter={v => getCurrencySymbol(selectedCurrency) + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v)}
+                                width={45}
+                              />
+                              <Tooltip
+                                cursor={{ fill: '#f8faff', rx: 8 }}
+                                formatter={v => [formatCurrency(v), 'Spent']}
+                                labelFormatter={m => { try { return new Date(m+'-01').toLocaleDateString('en-US',{month:'long',year:'numeric'}); } catch(e){return m;} }}
+                                contentStyle={{ borderRadius: '14px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.15)', padding: '12px 16px' }}
+                                labelStyle={{ fontWeight: 900, fontSize: '11px', color: '#4338ca', marginBottom: '4px' }}
+                                itemStyle={{ fontWeight: 700, fontSize: '12px', color: '#1e293b' }}
+                              />
+                              <Bar dataKey="total" fill="url(#barGradDash)" radius={[6,6,0,0]} maxBarSize={56} />
+                            </ComposedChart>
+                          </ResponsiveContainer>
+                        </div>
+                      )}
                     </div>
                   </div>
-                </div>
               </>
             ) : (
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
@@ -1649,45 +2213,59 @@ function App() {
         )}
 
         {activeTab === 'add-expense' && (
-          <div className="max-w-2xl mx-auto">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-medium text-gray-900">Add New Expense</h3>
-                <p className="text-sm text-gray-500 mt-1">Enter expense details manually</p>
+          <div className="max-w-3xl mx-auto py-12 px-4">
+            <div className="bg-white border-2 border-black shadow-[8px_8px_0_0_rgba(0,0,0,1)] rounded-none">
+              <div className="px-8 py-6 border-b-2 border-black">
+                <h3 className="text-2xl font-black text-black tracking-tight">Add New Expense</h3>
+                <p className="text-sm font-medium text-gray-600 mt-1">Enter expense details manually</p>
               </div>
               
-              <form onSubmit={handleSubmitExpense} className="p-6 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <form onSubmit={handleSubmitExpense} className="p-8 space-y-6 bg-white">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Amount (₹) *
+                    <label className="block text-sm font-bold text-black mb-2">
+                      Amount *
                     </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      required
-                      value={expenseForm.amount}
-                      onChange={(e) => setExpenseForm(prev => ({...prev, amount: e.target.value}))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                      placeholder="₹0.00"
-                    />
+                    <div className="flex gap-2">
+                      <select
+                        value={expenseForm.original_currency}
+                        onChange={(e) => setExpenseForm(prev => ({...prev, original_currency: e.target.value}))}
+                        className="w-24 px-3 py-2 border-2 border-black rounded-none focus:outline-none focus:ring-0 focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)] focus:-translate-y-px transition-all font-semibold"
+                      >
+                        {supportedCurrencies.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                      <input
+                        type="number"
+                        step="0.01"
+                        required
+                        value={expenseForm.amount}
+                        onChange={(e) => setExpenseForm(prev => ({...prev, amount: e.target.value}))}
+                        className="flex-1 px-3 py-2 border-2 border-black rounded-none focus:outline-none focus:ring-0 focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)] focus:-translate-y-px transition-all font-semibold"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    {expenseForm.original_currency !== 'INR' && exchangeRates[expenseForm.original_currency] && (
+                      <p className="mt-2 text-xs font-bold text-gray-500">
+                        ≈ ₹{((expenseForm.amount || 0) / (exchangeRates[expenseForm.original_currency] || 1)).toFixed(2)} at current rate
+                      </p>
+                    )}
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-bold text-black mb-2">
                       Date
                     </label>
                     <input
                       type="date"
                       value={expenseForm.date}
                       onChange={(e) => setExpenseForm(prev => ({...prev, date: e.target.value}))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border-2 border-black rounded-none focus:outline-none focus:ring-0 focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)] focus:-translate-y-px transition-all font-semibold"
                     />
                   </div>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-bold text-black mb-2">
                     Description *
                   </label>
                   <input
@@ -1695,20 +2273,20 @@ function App() {
                     required
                     value={expenseForm.description}
                     onChange={(e) => setExpenseForm(prev => ({...prev, description: e.target.value}))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border-2 border-black rounded-none focus:outline-none focus:ring-0 focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)] focus:-translate-y-px transition-all font-semibold"
                     placeholder="What did you spend money on? (e.g., Zomato order, auto fare, grocery shopping)"
                   />
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-bold text-black mb-2">
                       Category
                     </label>
                     <select
                       value={expenseForm.category}
                       onChange={(e) => setExpenseForm(prev => ({...prev, category: e.target.value}))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border-2 border-black rounded-none focus:outline-none focus:ring-0 focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)] focus:-translate-y-px transition-all font-semibold"
                     >
                       <option value="">AI will categorize</option>
                       {categories.map(cat => (
@@ -1718,33 +2296,54 @@ function App() {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-bold text-black mb-2">
                       Merchant
                     </label>
                     <input
                       type="text"
                       value={expenseForm.merchant}
                       onChange={(e) => setExpenseForm(prev => ({...prev, merchant: e.target.value}))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border-2 border-black rounded-none focus:outline-none focus:ring-0 focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)] focus:-translate-y-px transition-all font-semibold"
                       placeholder="Store or company name"
                     />
                   </div>
                 </div>
+
+                {groups.length > 0 && (
+                  <div className="bg-[#f0f4ff] p-6 border-y-2 border-dashed border-[#c3d4ff] -mx-8 px-8 my-6">
+                    <label className="block text-sm font-bold text-[#1e3a8a] mb-2">
+                       Post to Shared Wallet?
+                    </label>
+                    <select
+                      value={expenseForm.group_id}
+                      onChange={(e) => setExpenseForm(prev => ({...prev, group_id: e.target.value}))}
+                      className="w-full px-3 py-2 border-2 border-black rounded-none focus:outline-none focus:ring-0 focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)] focus:-translate-y-px transition-all font-semibold bg-white"
+                    >
+                      <option value="">No, keep this private</option>
+                      {groups.map(g => (
+                        <option key={g.id} value={g.id}>{g.name} (Shared)</option>
+                      ))}
+                    </select>
+                    <p className="mt-2 text-xs font-semibold text-[#3b82f6]">
+                      {expenseForm.group_id ? 'This will be visible to all wallet members and split equally.' : 'This expense will remain private to your account.'}
+                    </p>
+                  </div>
+                )}
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-bold text-black mb-2">
                     Notes
                   </label>
                   <textarea
                     value={expenseForm.notes}
                     onChange={(e) => setExpenseForm(prev => ({...prev, notes: e.target.value}))}
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border-2 border-black rounded-none focus:outline-none focus:ring-0 focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)] focus:-translate-y-px transition-all font-semibold"
                     placeholder="Additional notes (optional)"
                   />
                 </div>
                 
-                <div className="flex justify-end space-x-4">
+                <div className="flex justify-end space-x-4 pt-4 border-t-2 border-dashed border-gray-200 mt-6">
                   <button
                     type="button"
                     onClick={() => setExpenseForm({
@@ -1755,14 +2354,14 @@ function App() {
                       date: new Date().toISOString().split('T')[0],
                       notes: ''
                     })}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="px-6 py-2.5 text-sm font-bold text-black bg-white border-2 border-black hover:bg-gray-100 hover:shadow-[2px_2px_0_0_rgba(0,0,0,1)] focus:outline-none transition-all focus:-translate-y-px"
                   >
                     Clear
                   </button>
                   <button
                     type="submit"
                     disabled={loading}
-                    className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                    className="px-6 py-2.5 text-sm font-bold text-black bg-[#FFD700] hover:bg-[#F2C900] border-2 border-transparent hover:border-black hover:shadow-[2px_2px_0_0_rgba(0,0,0,1)] focus:outline-none transition-all disabled:opacity-50"
                   >
                     {loading ? 'Adding...' : 'Add Expense'}
                   </button>
@@ -1773,50 +2372,59 @@ function App() {
         )}
 
         {activeTab === 'receipt-scan' && (
-          <div className="max-w-2xl mx-auto">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-medium text-gray-900">📄 Scan Bill/Receipt</h3>
-                <p className="text-sm text-gray-500 mt-1">Upload your Indian bill/receipt and let AI extract expense details automatically</p>
+          <div className="max-w-3xl mx-auto py-12 px-4">
+            <div className="bg-white border-2 border-black shadow-[8px_8px_0_0_rgba(0,0,0,1)] rounded-none">
+              <div className="px-8 py-6 border-b-2 border-black flex gap-3 items-center">
+                <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                </svg>
+                <div>
+                  <h3 className="text-2xl font-black text-black tracking-tight">Scan Bill/Receipt</h3>
+                  <p className="text-sm font-medium text-gray-600 mt-1">Upload your Indian bill/receipt and let AI extract expense details automatically</p>
+                </div>
               </div>
               
-              <form onSubmit={handleReceiptUpload} className="p-6 space-y-6">
+              <form onSubmit={handleReceiptUpload} className="p-8 space-y-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-bold text-black mb-2">
                     Bill/Receipt Image *
                   </label>
-                  <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-indigo-400 transition-colors">
-                    <div className="space-y-1 text-center">
-                      <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                  <div className={"mt-1 flex justify-center px-6 pt-10 pb-12 border-2 border-black " + (receiptFile ? "border-solid bg-[#f0f9ff]" : "border-dashed bg-[#fafafa]") + " hover:border-blue-500 transition-colors cursor-pointer group"} onClick={() => document.getElementById('receipt-upload')?.click()}>
+                    <div className="space-y-2 text-center">
+                      <svg className="mx-auto h-12 w-12 text-black group-hover:text-blue-500 transition-colors" stroke="currentColor" fill="none" viewBox="0 0 24 24">
+                        <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="2" d="M12 4v10m0-10l-4 4m4-4l4 4m-8 6h8" />
+                        <rect x="3" y="3" width="18" height="18" rx="0" stroke="currentColor" strokeWidth="2" />
                       </svg>
-                      <div className="flex text-sm text-gray-600">
-                        <label htmlFor="receipt-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-500">
-                          <span>Upload your bill/receipt</span>
-                          <input 
-                            id="receipt-upload" 
-                            name="receipt-upload" 
-                            type="file" 
-                            accept="image/*" 
-                            className="sr-only"
-                            onChange={(e) => setReceiptFile(e.target.files[0])}
-                          />
-                        </label>
-                        <p className="pl-1">or drag and drop</p>
+                      <div className="text-sm text-black font-semibold mt-4">
+                        <span className="text-[#FFD700] underline underline-offset-4 font-bold decoration-black group-hover:text-blue-600">Upload your bill/receipt</span>
+                        <span className="text-gray-600 ml-1">or drag and drop</span>
+                        <input 
+                          id="receipt-upload" 
+                          name="receipt-upload" 
+                          type="file" 
+                          accept="image/*" 
+                          className="sr-only"
+                          onChange={(e) => setReceiptFile(e.target.files[0])}
+                        />
                       </div>
-                      <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                      <p className="text-xs text-gray-500 font-medium pt-1">PNG, JPG, GIF up to 10MB</p>
                       {receiptFile && (
-                        <p className="text-sm text-indigo-600 font-medium">Selected: {receiptFile.name}</p>
+                        <div className="mt-4 bg-white border border-black py-2 px-4 shadow-[2px_2px_0_0_rgba(0,0,0,1)] inline-block">
+                          <p className="text-sm text-black font-bold flex items-center gap-2">
+                            <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeJoin="miter" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
+                            {receiptFile.name}
+                          </p>
+                        </div>
                       )}
                     </div>
                   </div>
                 </div>
                 
-                <div className="flex justify-end">
+                <div className="flex justify-end pt-4 border-t-2 border-dashed border-gray-200 mt-6">
                   <button
                     type="submit"
                     disabled={!receiptFile || processingReceipt}
-                    className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                    className="px-8 py-3 text-sm font-bold text-black bg-[#FFD700] hover:bg-[#F2C900] border-2 border-transparent hover:border-black hover:shadow-[2px_2px_0_0_rgba(0,0,0,1)] focus:outline-none transition-all disabled:opacity-50 disabled:grayscale"
                   >
                     {processingReceipt ? 'Processing...' : 'Process Receipt'}
                   </button>
@@ -1824,27 +2432,29 @@ function App() {
               </form>
               
               {extractedData && (
-                <div className="px-6 pb-6">
-                  <div className="bg-green-50 border border-green-200 rounded-md p-4">
-                    <h4 className="text-sm font-medium text-green-800 mb-2">✅ Extracted Data</h4>
-                    <div className="text-sm text-green-700 space-y-1">
-                      <p><strong>Amount:</strong> {extractedData.amount ? formatCurrency(extractedData.amount) : 'Not found'}</p>
-                      <p><strong>Description:</strong> {extractedData.description || 'Not found'}</p>
-                      <p><strong>Merchant:</strong> {extractedData.merchant || 'Not found'}</p>
-                      <p><strong>Category:</strong> <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">{extractedData.category || 'Not found'}</span></p>
-                      <p><strong>Date:</strong> {extractedData.date || 'Not found'}</p>
+                <div className="px-8 pb-8">
+                  <div className="bg-green-50 border-2 border-black rounded-none shadow-[4px_4px_0_0_rgba(0,0,0,1)] p-6">
+                    <h4 className="text-lg font-black text-black mb-4 flex items-center gap-2">
+                      <span className="text-green-500">✅</span> Extracted Data
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm text-black font-medium">
+                      <div className="bg-white border border-gray-200 p-3"><span className="text-gray-500 font-bold block text-xs mb-1">Amount</span> {extractedData.amount ? formatCurrency(extractedData.amount) : 'Not found'}</div>
+                      <div className="bg-white border border-gray-200 p-3"><span className="text-gray-500 font-bold block text-xs mb-1">Date</span> {extractedData.date || 'Not found'}</div>
+                      <div className="bg-white border border-gray-200 p-3 col-span-2"><span className="text-gray-500 font-bold block text-xs mb-1">Merchant</span> {extractedData.merchant || 'Not found'}</div>
+                      <div className="bg-white border border-gray-200 p-3"><span className="text-gray-500 font-bold block text-xs mb-1">Description</span> {extractedData.description || 'Not found'}</div>
+                      <div className="bg-white border border-gray-200 p-3"><span className="text-gray-500 font-bold block text-xs mb-1">Category</span> <span className="inline-block bg-[#FFD700] px-2 py-0.5 border border-black shadow-[1px_1px_0_0_rgba(0,0,0,1)] text-xs font-bold">{extractedData.category || 'Not found'}</span></div>
                     </div>
 
                     {/* Show per-item prices when available */}
                     {extractedData.items && extractedData.items.length > 0 && (
-                      <div className="mt-3 text-sm text-green-700">
-                        <p className="font-medium">📦 Items ({extractedData.items.length})</p>
-                        <div className="mt-1 max-h-32 overflow-y-auto">
-                          <ul className="list-disc ml-5 space-y-1">
+                      <div className="mt-6">
+                        <p className="font-bold text-black mb-2 flex items-center gap-2">📦 Receipt Items <span className="text-xs bg-black text-white px-2 py-0.5 rounded-full">{extractedData.items.length}</span></p>
+                        <div className="border border-black bg-white overflow-hidden">
+                          <ul className="divide-y divide-gray-200 max-h-48 overflow-y-auto">
                             {(extractedData.items || []).map((it, idx) => (
-                              <li key={idx} className="flex justify-between items-center">
-                                <span>{it.quantity > 1 && `${it.quantity}x `}{it.name || 'Item'}</span>
-                                <span className="font-medium">{formatCurrency(Number(it.amount || 0))}</span>
+                              <li key={idx} className="flex justify-between items-center px-4 py-2 hover:bg-gray-50">
+                                <span className="font-medium text-black text-sm">{it.quantity > 1 && <span className="text-gray-500 mr-2">{it.quantity}x</span>}{it.name || 'Item'}</span>
+                                <span className="font-bold text-black text-sm">{formatCurrency(Number(it.amount || 0))}</span>
                               </li>
                             ))}
                           </ul>
@@ -1853,8 +2463,11 @@ function App() {
                     )}
 
                     {extractedData.receipt_url && (
-                      <div className="mt-2">
-                        <p className="text-xs text-green-600">📄 Receipt saved successfully</p>
+                      <div className="mt-4 flex items-center justify-between border-t border-gray-200 pt-4">
+                        <p className="text-xs font-bold text-green-700 flex items-center gap-1">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                          Receipt saved securely
+                        </p>
                       </div>
                     )}
                   </div>
@@ -1865,290 +2478,675 @@ function App() {
         )}
 
         {activeTab === 'assistant' && (
-          <div className="max-w-2xl mx-auto">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-2">💬 Assistant</h3>
-              <p className="text-sm text-gray-500 mb-4">Ask questions about your expenses (e.g., "How much did I spend this month?", "Show recent expenses").</p>
+          <div className="bg-[#f0f9ff] border-2 border-black shadow-[8px_8px_0_0_rgba(0,0,0,1)] flex flex-col h-[600px] rounded-none animate-fadeIn max-w-5xl mx-auto">
+            <div className="px-6 py-5 border-b-2 border-black flex items-center justify-between bg-white">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-[#FFD700] border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] flex items-center justify-center text-black">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="2.5" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+                </div>
+                <div>
+                  <h3 className="text-2xl font-black text-black tracking-tight uppercase">RupeeFlow AI Assistant</h3>
+                  <p className="text-[10px] text-blue-600 font-bold uppercase tracking-widest mt-1">Advanced Finance Intelligence</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setChatMessages([{ role: 'bot', text: "Hello! I'm your AI finance assistant. Ask me anything about your spending." }])}
+                className="inline-flex items-center gap-2 px-4 py-2 text-xs font-black text-black border-2 border-black bg-white hover:bg-gray-100 shadow-[2px_2px_0_0_rgba(0,0,0,1)] active:translate-y-px uppercase tracking-widest transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                Clear
+              </button>
+            </div>
 
-              <div className="h-64 overflow-y-auto border rounded p-3 mb-4 bg-gray-50" id="chatWindow">
-                {chatMessages.length === 0 ? (
-                  <p className="text-xs text-gray-500">Start by asking a question below.</p>
-                ) : (
-                  (chatMessages || []).map((m, i) => (
-                    <div key={i} className={`mb-2 ${m.role === 'user' ? 'text-right' : 'text-left'}`}>
-                      <div className={`inline-block px-3 py-1.5 rounded ${m.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 shadow-sm'}`}>
-                        {m.text}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-white">
+              {chatMessages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-black space-y-6">
+                  <div className="w-24 h-24 bg-gray-50 flex items-center justify-center border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+                    <svg className="w-12 h-12 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="2.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-3xl tracking-tighter text-black font-black uppercase mb-2">How can I help today?</p>
+                    <p className="text-sm font-bold text-gray-600 max-w-sm mx-auto leading-relaxed">Analyze spending, check budgets, or predict future trends with AI.</p>
+                  </div>
+                </div>
+              ) : (
+                chatMessages.map((m, index) => (
+                  <div key={index} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn`}>
+                    <div className={`flex max-w-[85%] ${m.role === 'user' ? 'flex-row-reverse space-x-reverse' : 'flex-row'} items-start space-x-4`}>
+                      <div className={`w-12 h-12 flex-shrink-0 flex items-center justify-center border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] transition-transform hover:-translate-y-1 ${
+                        m.role === 'user' ? 'bg-[#4f46e5] text-white' : 'bg-[#FFD700] text-black'
+                      }`}>
+                        {m.role === 'user' ? (
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                        ) : (
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                        )}
                       </div>
-                      {/* Render structured data returned by bot */}
-                      {m.role === 'bot' && m.data && (
-                        <div className="mt-2 text-left bg-white p-2 rounded shadow-sm">
-                          {m.data.total !== undefined && (
-                            <div className="mb-2">
-                              <p className="text-sm text-gray-600">Total:</p>
-                              <p className="text-lg font-semibold">{formatCurrency(Number(m.data.total || 0))}</p>
-                            </div>
-                          )}
-
-                          {m.data.category && (
-                            <div className="mb-2 text-sm text-gray-700">Category: {m.data.category}</div>
-                          )}
-
-                          {m.data.expenses && Array.isArray(m.data.expenses) && m.data.expenses.length > 0 && (
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-xs text-left">
-                                <thead>
-                                  <tr>
-                                    <th className="px-2 py-1">Date</th>
-                                    <th className="px-2 py-1">Description</th>
-                                    <th className="px-2 py-1">Category</th>
-                                    <th className="px-2 py-1 text-right">Amount</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {(m.data.expenses || []).slice(0, 5).map((ex, idx) => (
-                                    <tr key={idx} className="border-t">
-                                      <td className="px-2 py-1">{ex.date || (ex.created_at ? new Date(ex.created_at).toLocaleDateString() : '')}</td>
-                                      <td className="px-2 py-1 truncate">{ex.description}</td>
-                                      <td className="px-2 py-1">{ex.category}</td>
-                                      <td className="px-2 py-1 text-right">{formatCurrency(Number(ex.amount || 0))}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                              {m.data.expenses.length > 5 && (
-                                <p className="text-xs text-gray-500 mt-1 text-center">
-                                  Showing 5 of {m.data.expenses.length} expenses
-                                </p>
-                              )}
+                      <div className="flex flex-col">
+                        <div className={`p-5 text-sm font-bold border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] leading-relaxed ${
+                          m.role === 'user' ? 'bg-[#4f46e5] text-white' : 'bg-white text-black'
+                        }`}>
+                          <div className="whitespace-pre-wrap">{m.text}</div>
+                          {m.role === 'bot' && m.isAI && (
+                            <div className="mt-4 flex items-center">
+                              <span className="inline-flex items-center px-2 py-1 text-[10px] font-black bg-blue-50 text-blue-700 uppercase tracking-widest border border-black shadow-[1px_1px_0_0_rgba(0,0,0,1)]">
+                                <span className="mr-2">✨</span> AI Powered
+                              </span>
                             </div>
                           )}
                         </div>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
+                        {/* Render structured data returned by bot */}
+                        {m.role === 'bot' && m.data && (
+                          <div className="mt-4 text-left bg-white border-2 border-black p-5 shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+                            {m.data.total !== undefined && (
+                              <div className="mb-5">
+                                <p className="text-[10px] uppercase font-black text-black tracking-widest mb-2 flex items-center gap-2 border-b-2 border-black pb-1 inline-flex">
+                                  <span className="w-2 h-2 bg-[#FFD700] border border-black"></span>
+                                  Calculated Total
+                                </p>
+                                <p className="text-4xl font-black text-black block">{formatCurrency(Number(m.data.total || 0))}</p>
+                              </div>
+                            )}
 
-              <form onSubmit={async (e) => { e.preventDefault(); if (!chatInput) return; await sendChatQuestion(chatInput); setChatInput(''); setActiveTab('assistant'); }} className="flex items-center space-x-2">
-                <input
-                  type="text"
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  placeholder="Ask about your expenses..."
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none"
-                />
-                <button type="submit" disabled={chatLoading || !chatInput} className="px-4 py-2 bg-indigo-600 text-white rounded-md disabled:opacity-50">
-                  {chatLoading ? 'Thinking...' : 'Send'}
+                            {m.data.expenses && Array.isArray(m.data.expenses) && m.data.expenses.length > 0 && (
+                              <div className="mt-4 text-left">
+                                <p className="text-[10px] uppercase font-black text-black tracking-widest mb-3 flex items-center gap-2 border-b-2 border-black pb-1 inline-flex">
+                                  <span className="w-2 h-2 bg-blue-500 border border-black"></span>
+                                  Recent Matches
+                                </p>
+                                <div className="space-y-3">
+                                  {(m.data.expenses || []).slice(0, 5).map((ex, idx) => (
+                                    <div key={idx} className="flex justify-between items-center p-3 bg-white border-2 border-black hover:-translate-y-1 hover:shadow-[2px_2px_0_0_rgba(0,0,0,1)] transition-all text-sm group">
+                                      <div className="flex items-center space-x-3 truncate">
+                                        <span className="w-2 h-2 bg-black flex-shrink-0"></span>
+                                        <div className="truncate">
+                                          <p className="text-black font-black uppercase truncate">{ex.description}</p>
+                                          <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest mt-1">{ex.category} • {ex.date}</p>
+                                        </div>
+                                      </div>
+                                      <span className="font-black text-black pl-3">{formatCurrency(Number(ex.amount || 0))}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                                {m.data.expenses.length > 5 && (
+                                  <button 
+                                    onClick={() => setActiveTab('expenses')}
+                                    className="w-full text-center mt-4 p-3 text-xs bg-[#FFD700] text-black font-black hover:bg-[#F2C900] border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] uppercase tracking-widest transition-all active:translate-y-px"
+                                  >
+                                    VIEW ALL {m.data.expenses.length} TRANSACTIONS →
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+              {chatLoading && (
+                <div className="flex justify-start">
+                  <div className="flex items-start space-x-4">
+                    <div className="w-12 h-12 bg-white border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] flex items-center justify-center text-black">
+                      <svg className="w-6 h-6 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    </div>
+                    <div className="bg-white p-5 border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] text-sm text-black flex items-center space-x-3 font-bold uppercase tracking-widest">
+                      <div className="flex space-x-1.5">
+                        <span className="w-2 h-2 bg-black block animate-bounce [animation-delay:-0.3s]"></span>
+                        <span className="w-2 h-2 bg-black block animate-bounce [animation-delay:-0.15s]"></span>
+                        <span className="w-2 h-2 bg-black block animate-bounce"></span>
+                      </div>
+                      <span className="ml-3">Assistant is thinking...</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            <div className="bg-white border-t-2 border-black p-6">
+              <form 
+                onSubmit={async (e) => { 
+                  e.preventDefault(); 
+                  if (!chatInput || chatLoading) return; 
+                  const input = chatInput;
+                  setChatInput(''); 
+                  await sendChatQuestion(input); 
+                }} 
+                className="flex items-center gap-3"
+              >
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder="ASK ABOUT SPENDING, BUDGETS, OR FORECAST..."
+                    disabled={chatLoading}
+                    className="w-full px-5 py-4 bg-white border-2 border-black font-bold outline-none focus:shadow-[4px_4px_0_0_rgba(0,0,0,1)] focus:-translate-y-px transition-all placeholder:text-gray-400 placeholder:font-black text-sm"
+                  />
+                </div>
+                <button 
+                  type="submit" 
+                  disabled={chatLoading || !chatInput} 
+                  className="w-14 h-[54px] flex items-center justify-center bg-[#FFD700] text-black border-2 border-black disabled:bg-gray-100 disabled:opacity-50 transition-all shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:-translate-y-1 hover:shadow-[6px_6px_0_0_rgba(0,0,0,1)] active:translate-y-px active:shadow-[2px_2px_0_0_rgba(0,0,0,1)] shrink-0"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                 </button>
               </form>
+              <div className="flex gap-3 mt-4 overflow-x-auto no-scrollbar pb-2">
+                {['Total spent today', 'Food expenses', 'Budget status'].map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    onClick={() => setChatInput(suggestion)}
+                    className="whitespace-nowrap px-4 py-2 bg-white border-2 border-black text-[10px] font-black uppercase tracking-widest text-black hover:bg-black hover:text-[#FFD700] transition-colors shadow-[2px_2px_0_0_rgba(0,0,0,1)] active:translate-y-px"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
 
-        {activeTab === 'expenses' && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="text-lg font-medium text-gray-900">All Expenses</h3>
-              <p className="text-sm text-gray-500">{(expenses || []).length} total expenses</p>
+
+
+        {activeTab === 'analytics' && (() => {
+          // Compute monthly trend from raw expenses (works without userDashboard)
+          const monthlyMap = {};
+          (expenses || []).forEach(exp => {
+            const month = (exp.date || '').substring(0, 7);
+            if (!month) return;
+            if (!monthlyMap[month]) monthlyMap[month] = { month, total: 0, count: 0 };
+            monthlyMap[month].total += (exp.amount || 0);
+            monthlyMap[month].count += 1;
+          });
+          const monthlyTrend = Object.values(monthlyMap).sort((a, b) => a.month.localeCompare(b.month));
+
+          const PALETTE = ['#4f46e5','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#f97316','#14b8a6','#6366f1'];
+          const categoryData = Object.entries(getCategoryTotals())
+            .sort(([,a],[,b]) => b - a)
+            .map(([name, value]) => ({ name, value }));
+
+          const totalSpent = (expenses || []).reduce((s, e) => s + (e.amount || 0), 0);
+          const avgTx = expenses.length > 0 ? totalSpent / expenses.length : 0;
+          const topCat = categoryData[0]?.name || '—';
+          const thisMonthKey = new Date().toISOString().substring(0, 7);
+          const thisMonth = monthlyMap[thisMonthKey]?.total || 0;
+
+          return (
+          <div className="space-y-6">
+            {/* KPI Row */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              {[
+                { label: 'Total Spent', value: formatCurrency(totalSpent), icon: '💸', bg: '#FFD700', text: 'text-black' },
+                { label: 'This Month', value: formatCurrency(thisMonth), icon: '📅', bg: '#4f46e5', text: 'text-white' },
+                { label: 'Avg Transaction', value: formatCurrency(avgTx), icon: '📊', bg: '#10b981', text: 'text-black' },
+                { label: 'Top Category', value: topCat, icon: '🏆', bg: '#f472b6', text: 'text-black' },
+              ].map(kpi => (
+                <div key={kpi.label} className={`rounded-none border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] p-5 hover:-translate-y-1 hover:shadow-[6px_6px_0_0_rgba(0,0,0,1)] transition-all flex flex-col justify-between`} style={{backgroundColor: kpi.bg}}>
+                  <div className={`flex items-center gap-3 mb-4 ${kpi.text}`}>
+                    <span className="text-2xl bg-white/20 p-2 border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)]">{kpi.icon}</span>
+                    <p className="text-xs font-black uppercase tracking-widest leading-tight">{kpi.label}</p>
+                  </div>
+                  <p className={`text-2xl lg:text-3xl font-black truncate ${kpi.text}`}>{kpi.value}</p>
+                </div>
+              ))}
             </div>
-            
-            {loading ? (
-              <div className="p-8 text-center">
-                <div className="inline-flex items-center px-4 py-2 font-semibold leading-6 text-sm shadow rounded-md text-indigo-500 bg-white">
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Loading expenses...
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Monthly Trend AreaChart - built from local data */}
+              <div className="bg-white rounded-none border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+                <div className="px-6 py-4 border-b-2 border-black flex items-center gap-3 bg-[#f0f9ff]">
+                  <span className="w-10 h-10 bg-white border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] flex items-center justify-center text-lg">📈</span>
+                  <h3 className="text-xl font-black text-black tracking-tight">Monthly Spending</h3>
+                </div>
+                <div className="p-6">
+                  {monthlyTrend.length === 0 ? (
+                    <div className="h-[260px] flex items-center justify-center">
+                      <p className="text-gray-400 text-sm italic">Add expenses to see trends</p>
+                    </div>
+                  ) : (
+                    <div className="h-[260px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} barCategoryGap="35%">
+                          <defs>
+                            <linearGradient id="barGradAnalytics" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#6366f1" stopOpacity={1}/>
+                              <stop offset="100%" stopColor="#4338ca" stopOpacity={0.8}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                          <XAxis dataKey="month"
+                            tickFormatter={m => { try { return new Date(m+'-01').toLocaleDateString('en-US',{month:'short',year:'2-digit'}); } catch(e){return m;} }}
+                            axisLine={false} tickLine={false}
+                            tick={{ fontSize: 11, fontWeight: 700, fill: '#94a3b8' }}
+                          />
+                          <YAxis axisLine={false} tickLine={false}
+                            tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }}
+                            tickFormatter={v => getCurrencySymbol(selectedCurrency) + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v)}
+                            width={45}
+                          />
+                          <Tooltip
+                            cursor={{ fill: '#f8faff', rx: 8 }}
+                            formatter={v => [formatCurrency(v), 'Spent']}
+                            labelFormatter={m => { try { return new Date(m+'-01').toLocaleDateString('en-US',{month:'long',year:'numeric'}); } catch(e){return m;} }}
+                            contentStyle={{ borderRadius: '14px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.15)', padding: '12px 16px' }}
+                            labelStyle={{ fontWeight: 900, fontSize: '11px', color: '#4338ca', marginBottom: '4px' }}
+                            itemStyle={{ fontWeight: 700, fontSize: '12px', color: '#1e293b' }}
+                          />
+                          <Bar dataKey="total" fill="url(#barGradAnalytics)" radius={[6,6,0,0]} maxBarSize={56} />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
                 </div>
               </div>
-            ) : (expenses || []).length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                <p>No expenses yet. Add your first expense to get started!</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-200">
-                {(expenses || []).map(expense => (
-                  <div key={expense.id} className="px-6 py-4">
-                    <div className="flex items-center justify-between">
-                      <div 
-                        className="flex items-center space-x-3 flex-1 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
-                        onClick={() => openExpenseDetails(expense)}
-                        title="Click to view full details"
-                      >
-                        <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                          <span className="text-xl">
-                            {expense.category === 'Food & Dining' ? '🍽️' :
-                             expense.category === 'Groceries & Household' ? '🛒' :
-                             expense.category === 'Transportation' ? '🚗' :
-                             expense.category === 'Shopping & Clothes' ? '👕' :
-                             expense.category === 'Bills & Utilities' ? '⚡' :
-                             expense.category === 'Mobile & Internet' ? '📱' :
-                             expense.category === 'Healthcare' ? '🏥' :
-                             expense.category === 'Entertainment' ? '🎬' :
-                             expense.category === 'Travel & Vacation' ? '✈️' :
-                             expense.category === 'Education & Courses' ? '📚' :
-                             expense.category === 'Home & Family' ? '🏠' :
-                             expense.category === 'Personal Care' ? '💅' :
-                             expense.category === 'Gifts & Festivals' ? '🎁' :
-                             expense.category === 'EMI & Loans' ? '💳' :
-                             expense.category === 'Investments & SIP' ? '📈' : '💼'}
-                          </span>
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-900">{expense.description}</p>
-                          <p className="text-sm text-gray-500">
-                            {expense.category}
-                            {expense.merchant && ` • ${expense.merchant}`}
-                            {expense.ai_categorized && (
-                              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                                AI
-                              </span>
-                            )}
-                          </p>
-                          <p className="text-xs text-gray-400">{expense.date}</p>
 
-                          {/* Show preview of itemized lines */}
-                          {expense.items && expense.items.length > 0 && (
-                            <p className="text-xs text-gray-600 mt-1">
-                              📦 {expense.items.length} items • Click to view details
-                            </p>
-                          )}
-                        </div>
+              {/* Category Donut */}
+              <div className="bg-white rounded-none border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+                <div className="px-6 py-4 border-b-2 border-black flex items-center gap-3 bg-[#f0f9ff]">
+                  <span className="w-10 h-10 bg-white border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] flex items-center justify-center text-lg">📊</span>
+                  <h3 className="text-xl font-black text-black tracking-tight">Category Breakdown</h3>
+                </div>
+                <div className="p-6">
+                  {categoryData.length === 0 ? (
+                    <div className="h-[260px] flex items-center justify-center">
+                      <p className="text-gray-400 text-sm italic">No category data yet</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                      <div className="h-[220px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie data={categoryData} cx="50%" cy="50%" innerRadius={60} outerRadius={90}
+                              paddingAngle={4} dataKey="value" stroke="#000" strokeWidth={2}>
+                              {categoryData.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
+                            </Pie>
+                            <Tooltip formatter={v => [formatCurrency(v), 'Spent']}
+                              contentStyle={{ borderRadius: '0', border: '2px solid black', boxShadow: '4px 4px 0 0 rgba(0,0,0,1)', fontWeight: 'bold' }} />
+                          </PieChart>
+                        </ResponsiveContainer>
                       </div>
-                      <div className="flex items-center space-x-3">
-                        <div className="text-right">
-                          <p className="text-lg font-semibold text-gray-900">
-                            {formatCurrency(expense.amount)}
-                          </p>
-                          {expense.ai_confidence && (
-                            <p className="text-xs text-gray-500">
-                              {Math.round(expense.ai_confidence * 100)}% confidence
-                            </p>
-                          )}
-                        </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteExpense(expense.id);
-                          }}
-                          className="text-gray-400 hover:text-red-500 transition-colors"
-                          title="Delete expense"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
+                      <div className="space-y-3">
+                        {categoryData.slice(0, 6).map((cat, i) => (
+                          <div key={cat.name} className="flex items-center gap-3 p-2 border-2 border-transparent hover:border-black hover:bg-gray-50 transition-colors">
+                            <div className="w-4 h-4 border-2 border-black flex-shrink-0 shadow-[1px_1px_0_0_rgba(0,0,0,1)]" style={{ background: PALETTE[i % PALETTE.length] }} />
+                            <p className="text-sm font-bold text-black truncate flex-1">{cat.name}</p>
+                            <p className="text-sm font-black text-black flex-shrink-0">{formatCurrency(cat.value)}</p>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Monthly breakdown table */}
+            {(analytics || []).length > 0 && (
+              <div className="bg-white rounded-none border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] mb-8">
+                <div className="px-6 py-4 border-b-2 border-black bg-[#4f46e5]">
+                  <h3 className="text-xl font-black text-white tracking-tight">Month-by-Month Detail</h3>
+                </div>
+                <div className="divide-y-2 divide-black">
+                  {(analytics || []).map(month => (
+                    <div key={month.month} className="p-6 bg-white hover:bg-gray-50 transition-colors">
+                      <div className="flex items-center justify-between mb-4">
+                        <p className="font-black text-black text-lg">{month.month}</p>
+                        <div className="text-right">
+                          <p className="font-black text-black text-xl">{formatCurrency(month.total)}</p>
+                          <p className="text-xs text-blue-600 uppercase font-black tracking-widest mt-1 bg-blue-50 border border-black inline-block px-2 py-0.5 shadow-[1px_1px_0_0_rgba(0,0,0,1)]">{month.expense_count} transactions</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                        {(month.categories || []).slice(0, 6).map(cat => (
+                          <div key={cat.category}>
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="text-xs font-bold text-gray-600 uppercase truncate">{cat.category}</span>
+                              <span className="text-sm font-black text-black ml-1">{formatCurrency(cat.total)}</span>
+                            </div>
+                            <div className="w-full bg-white border-2 border-black rounded-none h-3 shadow-[1px_1px_0_0_rgba(0,0,0,1)]">
+                              <div className="bg-[#FFD700] h-full border-r-2 border-black transition-all" style={{width:`${Math.min(cat.percentage,100)}%`}} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
-        )}
+          );
+        })()}
 
-        {activeTab === 'analytics' && (
+        {activeTab === 'predictions' && (
           <div className="space-y-6">
-            {/* Category Breakdown */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-medium text-gray-900">📊 Category Breakdown</h3>
+            <div className="bg-white border-2 border-black shadow-[8px_8px_0_0_rgba(0,0,0,1)] rounded-none p-8 text-center max-w-5xl mx-auto">
+              <div className="w-24 h-24 bg-[#FFD700] border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] flex items-center justify-center mx-auto mb-8">
+                <svg className="w-12 h-12 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="2.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
               </div>
-              <div className="p-6">
-                {Object.entries(getCategoryTotals()).length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">No expenses to analyze yet</p>
-                ) : (
-                  <div className="space-y-4">
-                    {Object.entries(getCategoryTotals())
-                      .sort(([,a], [,b]) => b - a)
-                      .map(([category, total]) => {
-                        const percentage = (total / getTotalExpenses()) * 100;
-                        return (
-                          <div key={category} className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3 flex-1">
-                              <span className="text-lg">
-                                {category === 'Food & Dining' ? '🍽️' :
-                                 category === 'Groceries & Household' ? '🛒' :
-                                 category === 'Transportation' ? '🚗' :
-                                 category === 'Shopping & Clothes' ? '👕' :
-                                 category === 'Bills & Utilities' ? '⚡' :
-                                 category === 'Mobile & Internet' ? '📱' :
-                                 category === 'Healthcare' ? '🏥' :
-                                 category === 'Entertainment' ? '🎬' :
-                                 category === 'Travel & Vacation' ? '✈️' :
-                                 category === 'Education & Courses' ? '📚' :
-                                 category === 'Home & Family' ? '🏠' :
-                                 category === 'Personal Care' ? '💅' :
-                                 category === 'Gifts & Festivals' ? '🎁' :
-                                 category === 'EMI & Loans' ? '💳' :
-                                 category === 'Investments & SIP' ? '📈' : '💼'}
-                              </span>
-                              <div className="flex-1">
-                                <div className="flex items-center justify-between mb-1">
-                                  <p className="text-sm font-medium text-gray-900">{category}</p>
-                                  <p className="text-sm font-medium text-gray-900">{formatCurrency(total)}</p>
-                                </div>
-                                <div className="w-full bg-gray-200 rounded-full h-2">
-                                  <div 
-                                    className="bg-indigo-600 h-2 rounded-full transition-all duration-300" 
-                                    style={{width: `${percentage}%`}}
-                                  ></div>
-                                </div>
-                                <p className="text-xs text-gray-500 mt-1">{percentage.toFixed(1)}% of total</p>
-                              </div>
+              <h2 className="text-4xl font-black text-black mb-4 tracking-tighter uppercase">AI Spending Forecast</h2>
+              <p className="text-black font-bold mb-10 text-xl max-w-2xl mx-auto leading-tight">Predicting your financial future using historical trends and machine learning.</p>
+              
+              {loadingForecast ? (
+                <div className="flex flex-col items-center justify-center p-12 border-2 text-black border-dashed border-black bg-yellow-50">
+                   <div className="animate-spin h-12 w-12 border-4 border-t-[#FFD700] border-black rounded-full mb-6"></div>
+                   <p className="text-black text-lg font-black tracking-widest uppercase animate-pulse">Analyzing patterns...</p>
+                </div>
+              ) : forecast ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
+                  <div className="bg-[#4f46e5] border-2 border-black rounded-none p-8 text-white shadow-[4px_4px_0_0_rgba(0,0,0,1)] transition-transform hover:-translate-y-1">
+                    <p className="uppercase tracking-widest text-[#FFD700] text-sm font-black mb-2 border-b-2 border-[#FFD700] inline-block pb-1">Next Month Prediction</p>
+                    <h3 className="text-6xl font-black mb-6 mt-4 tracking-tighter">{formatCurrency(forecast.predicted_total)}</h3>
+                    <div className="bg-black/20 border-2 border-black p-4">
+                      <p className="text-sm font-black text-[#FFD700] uppercase tracking-wider mb-2">💡 Trend Insight</p>
+                      <p className="text-sm text-white font-bold leading-snug">Our AI predicts this based on your most recent spending behaviors and seasonal trends.</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-6">
+                    <div className="bg-[#FFD700] border-2 border-black rounded-none p-6 shadow-[4px_4px_0_0_rgba(0,0,0,1)] transition-transform hover:-translate-y-1">
+                      <h4 className="font-black text-black text-lg uppercase tracking-wider mb-4 flex items-center gap-3">
+                        <span className="w-8 h-8 bg-white border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] flex items-center justify-center text-sm">⭐</span>
+                        Saving Opportunity
+                      </h4>
+                      <p className="text-black text-base font-bold italic leading-relaxed">"{forecast.savings_tip}"</p>
+                    </div>
+                    
+                    <div className="bg-white border-2 border-black rounded-none p-6 shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+                      <h4 className="font-black text-black text-lg uppercase tracking-wider mb-4 border-b-2 border-black pb-2">Top Expected Categories</h4>
+                      <div className="space-y-3">
+                        {forecast.top_categories.map((cat, i) => (
+                          <div key={i} className="flex justify-between items-center text-sm">
+                            <span className="text-black font-bold uppercase">{cat}</span>
+                            <span className="font-black text-xs text-white bg-[#4f46e5] border border-black px-2 py-1 shadow-[1px_1px_0_0_rgba(0,0,0,1)] tracking-widest uppercase">High Prob.</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-gray-50 p-12 border-2 border-dashed border-black">
+                   <p className="text-black font-bold text-lg">Not enough data to generate a forecast yet. Keep recording expenses!</p>
+                </div>
+              )}
+            </div>
+            
+            <div className="bg-[#10b981] border-2 border-black rounded-none p-8 text-black shadow-[8px_8px_0_0_rgba(0,0,0,1)] overflow-hidden relative max-w-5xl mx-auto">
+              <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                <div>
+                  <h3 className="text-3xl font-black mb-3 tracking-tighter uppercase">Smart Alerts Enabled</h3>
+                  <p className="text-black font-bold mb-6 max-w-lg leading-relaxed text-lg">Our AI now monitors every transaction. If we detect an unusual spike or an unexpected recurring bill, you'll see a red <span className="bg-red-500 text-white px-2 py-0.5 border border-black">ANOMALY</span> tag in your history.</p>
+                  <div className="flex gap-4">
+                    <div className="flex items-center gap-2 text-sm font-black uppercase tracking-wider bg-white border-2 border-black px-3 py-2 shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                      <span className="w-3 h-3 bg-red-500 border border-black animate-pulse"></span>
+                      Anomaly Detection
+                    </div>
+                    <div className="flex items-center gap-2 text-sm font-black uppercase tracking-wider bg-white border-2 border-black px-3 py-2 shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                      <span className="w-3 h-3 bg-blue-500 border border-black"></span>
+                      Pattern Recognition
+                    </div>
+                  </div>
+                </div>
+                {/* Decorative Element */}
+                <div className="hidden md:flex flex-shrink-0 w-48 h-48 border-4 border-black bg-white shadow-[8px_8px_0_0_rgba(0,0,0,1)] items-center justify-center p-4">
+                   <div className="w-full h-full border-4 border-dashed border-black rounded-full flex items-center justify-center animate-[spin_10s_linear_infinite]">
+                     <div className="w-16 h-16 bg-[#FFD700] border-4 border-black"></div>
+                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {activeTab === 'groups' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Sidebar: Group List & Create/Join */}
+              <div className="lg:col-span-1 space-y-6">
+                <div className="bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] rounded-none overflow-hidden flex flex-col h-full">
+                  <div className="p-6 bg-[#4f46e5] border-b-2 border-black flex items-center justify-between">
+                    <h3 className="text-xl font-black text-white tracking-tight flex items-center gap-3">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="2.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                      My Wallets
+                    </h3>
+                  </div>
+                  <div className="p-4 space-y-2 max-h-[400px] overflow-y-auto bg-white flex-1">
+                    {loadingGroups ? (
+                      <div className="py-8 text-center text-gray-400 text-sm font-bold animate-pulse">Loading wallets...</div>
+                    ) : groups.length === 0 ? (
+                      <div className="py-8 text-center text-gray-500 text-sm font-bold border-2 border-dashed border-gray-300">No shared wallets yet.<br/>Create one or join with a code!</div>
+                    ) : (
+                      groups.map(group => (
+                        <button
+                          key={group.id}
+                          onClick={() => {
+                            setSelectedGroup(group);
+                            fetchGroupExpenses(group.id);
+                          }}
+                          className={`w-full flex items-center p-3 transition-all border-2 ${
+                            selectedGroup?.id === group.id 
+                            ? 'bg-blue-50 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)]' 
+                            : 'border-transparent hover:border-black hover:shadow-[2px_2px_0_0_rgba(0,0,0,1)] text-black bg-white'
+                          }`}
+                        >
+                          <div className="flex items-center gap-4 w-full">
+                            <div className="w-12 h-12 bg-[#4f46e5] border-2 border-black text-white flex items-center justify-center font-black text-sm shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                               {group.name?.substring(0, 2).toUpperCase() || 'SW'}
+                            </div>
+                            <div className="text-left flex-1">
+                              <p className="text-base font-black text-black leading-tight">{group.name}</p>
+                              <p className="text-[10px] text-blue-600 font-bold uppercase tracking-widest mt-1">{(group.members || []).length} MEMBER{(group.members || []).length !== 1 ? 'S' : ''}</p>
                             </div>
                           </div>
-                        );
-                      })
-                    }
+                        </button>
+                      ))
+                    )}
+                  </div>
+                  <div className="p-4 bg-white border-t-2 border-black space-y-4">
+                    {/* Join Wallet */}
+                    <div className="flex gap-2">
+                      <input 
+                        type="text"
+                        placeholder="Enter invite code..."
+                        value={groupInviteCode}
+                        onChange={e => setGroupInviteCode(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && joinGroup(groupInviteCode)}
+                        className="flex-1 px-3 py-2 bg-white border-2 border-black text-sm font-bold outline-none focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)] focus:-translate-y-px transition-all"
+                      />
+                      <button
+                        onClick={() => joinGroup(groupInviteCode)}
+                        disabled={!groupInviteCode.trim()}
+                        className="px-4 py-2 bg-[#FFD700] border-2 border-black text-black font-black hover:bg-[#F2C900] disabled:opacity-50 disabled:grayscale transition-all hover:shadow-[2px_2px_0_0_rgba(0,0,0,1)] active:-translate-y-px"
+                      >
+                        Join
+                      </button>
+                    </div>
+                    {/* Create Wallet */}
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="New wallet name..."
+                        value={newWalletName}
+                        onChange={e => setNewWalletName(e.target.value)}
+                        onKeyDown={e => { if(e.key==='Enter' && newWalletName.trim()){ createGroup(newWalletName.trim(), ''); setNewWalletName(''); } }}
+                        className="flex-1 px-3 py-2 bg-white border-2 border-black text-sm font-bold outline-none focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)] focus:-translate-y-px transition-all"
+                      />
+                      <button
+                        onClick={() => { if(newWalletName.trim()){ createGroup(newWalletName.trim(), ''); setNewWalletName(''); } }}
+                        disabled={!newWalletName.trim()}
+                        className="px-4 py-2 bg-[#FFD700] border-2 border-black text-black font-black hover:bg-[#F2C900] disabled:opacity-50 disabled:grayscale transition-all hover:shadow-[2px_2px_0_0_rgba(0,0,0,1)] active:-translate-y-px"
+                      >
+                        + New
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main: Group View */}
+              <div className="lg:col-span-2">
+                {!selectedGroup ? (
+                  <div className="h-full bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] rounded-none flex flex-col items-center justify-center p-12 text-center min-h-[500px]">
+                    <div className="w-20 h-20 bg-gray-50 border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] flex items-center justify-center mb-6">
+                      <svg className="w-10 h-10 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="2.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                    </div>
+                    <h4 className="text-3xl font-black text-black mb-3 tracking-tighter">Select a Wallet</h4>
+                    <p className="text-base font-bold text-gray-600 max-w-sm leading-snug">Pick a shared wallet from the left to view group spending and settle up with friends.</p>
+                  </div>
+                ) : (
+                  <div className="bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] rounded-none overflow-hidden flex flex-col min-h-[500px]">
+                    {/* Group Header */}
+                    <div className="p-6 border-b-2 border-black flex flex-wrap gap-4 justify-between items-start bg-white">
+                      <div>
+                        <h3 className="text-3xl font-black text-black tracking-tight">{selectedGroup.name}</h3>
+                        <p className="text-xs text-gray-600 font-bold flex items-center gap-2 mt-2">
+                          <span className="uppercase text-[10px] tracking-widest text-black">Invite Code: </span>
+                          <span className="bg-[#FFD700] border border-black px-2 py-0.5 font-bold text-black select-all cursor-pointer shadow-[1px_1px_0_0_rgba(0,0,0,1)]" title="Click to copy" onClick={() => navigator.clipboard?.writeText(selectedGroup.invite_code)}>
+                            {selectedGroup.invite_code}
+                          </span>
+                          <span className="text-gray-400 font-black">•</span>
+                          <span className="text-blue-600 font-black uppercase tracking-widest text-[10px]">{(selectedGroup.members || []).length} MEMBER{(selectedGroup.members || []).length !== 1 ? 'S' : ''}</span>
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => { setShowAddBill(v => !v); setGroupBillForm({ description: '', amount: '', category: 'Shared' }); }}
+                        className="px-6 py-2.5 bg-[#FFD700] text-black border-2 border-black font-black hover:bg-[#F2C900] shadow-[2px_2px_0_0_rgba(0,0,0,1)] transition-all active:-translate-y-px text-sm"
+                      >
+                        {showAddBill ? '✕ Cancel' : '+ Add Bill'}
+                      </button>
+                    </div>
+
+                    {/* Inline Add Bill Form */}
+                    {showAddBill && (
+                      <form onSubmit={submitGroupBill} className="p-6 bg-[#f0f9ff] border-b-2 border-black flex flex-wrap gap-4 items-end">
+                        <div className="flex-1 min-w-[140px]">
+                          <label className="block text-xs font-black text-black uppercase tracking-widest mb-2">Description *</label>
+                          <input required type="text" placeholder="e.g. Monthly rent" value={groupBillForm.description}
+                            onChange={e => setGroupBillForm(p => ({...p, description: e.target.value}))}
+                            className="w-full px-3 py-2 border-2 border-black rounded-none text-sm font-bold outline-none focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)] focus:-translate-y-px transition-all bg-white" />
+                        </div>
+                        <div className="w-36">
+                          <label className="block text-xs font-black text-black uppercase tracking-widest mb-2">Amount (₹) *</label>
+                          <input required type="number" min="0" step="0.01" placeholder="0.00" value={groupBillForm.amount}
+                            onChange={e => setGroupBillForm(p => ({...p, amount: e.target.value}))}
+                            className="w-full px-3 py-2 border-2 border-black rounded-none text-sm font-bold outline-none focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)] focus:-translate-y-px transition-all bg-white" />
+                        </div>
+                        <div className="w-44">
+                          <label className="block text-xs font-black text-black uppercase tracking-widest mb-2">Category</label>
+                          <select value={groupBillForm.category}
+                            onChange={e => setGroupBillForm(p => ({...p, category: e.target.value}))}
+                            className="w-full px-3 py-2 border-2 border-black rounded-none text-sm font-bold outline-none focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)] focus:-translate-y-px transition-all bg-white">
+                            {['Shared','Food & Dining','Groceries & Household','Bills & Utilities','Entertainment','Travel & Vacation','Other'].map(c => <option key={c}>{c}</option>)}
+                          </select>
+                        </div>
+                        <button type="submit" className="px-6 py-2 h-[42px] bg-[#FFD700] text-black border-2 border-black rounded-none text-sm font-black hover:bg-[#F2C900] shadow-[2px_2px_0_0_rgba(0,0,0,1)] transition-all active:-translate-y-px">
+                          Split & Save
+                        </button>
+                      </form>
+                    )}
+
+                    {/* Group Sub-Tabs */}
+                    <div className="flex border-b-2 border-black bg-white relative z-10 px-6 gap-6 shadow-[0_2px_0_0_rgba(0,0,0,1)]">
+                      <button onClick={() => setGroupTab('transactions')}
+                        className={`py-4 text-sm font-black uppercase tracking-wider transition-colors border-b-4 ${groupTab==='transactions'?'border-blue-600 text-blue-700':'border-transparent text-gray-400 hover:text-black hover:border-black'}`}>
+                        Transactions
+                      </button>
+                      <button onClick={() => setGroupTab('settlements')}
+                        className={`py-4 text-sm font-black uppercase tracking-wider transition-colors border-b-4 ${groupTab==='settlements'?'border-blue-600 text-blue-700':'border-transparent text-gray-400 hover:text-black hover:border-black'}`}>
+                        Settle Up
+                      </button>
+                    </div>
+
+                    {/* View Area */}
+                    <div className="flex-1 overflow-y-auto min-h-[400px] bg-white">
+                      {groupTab === 'transactions' ? (
+                        groupExpenses.length === 0 ? (
+                          <div className="py-24 text-center">
+                            <div className="w-20 h-20 bg-gray-50 flex items-center justify-center mx-auto mb-6 border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+                              <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="2.5" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 8l2 2 4-4" /></svg>
+                            </div>
+                            <p className="text-xl font-black text-black mb-2">No transactions yet.</p>
+                            <p className="text-sm font-bold text-gray-500">Click "+ Add Bill" above to split your first expense.</p>
+                          </div>
+                        ) : (
+                          <div className="divide-y-2 divide-black bg-white">
+                            {groupExpenses.map((exp, i) => (
+                              <div key={exp.id || i} className="px-6 py-5 hover:bg-yellow-50 transition-colors flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                  <div className="w-12 h-12 bg-white border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] text-black rounded-none flex items-center justify-center text-xl">
+                                    {exp.category === 'Food & Dining' ? '🍽️' : exp.category === 'Groceries & Household' ? '🛒' : exp.category === 'Bills & Utilities' ? '⚡' : exp.category === 'Entertainment' ? '🎬' : exp.category === 'Travel & Vacation' ? '✈️' : '🏦'}
+                                  </div>
+                                  <div>
+                                    <p className="text-base font-black text-black uppercase">{exp.description}</p>
+                                    <p className="text-[11px] text-gray-600 font-bold uppercase tracking-widest mt-1">
+                                      {exp.category} • {exp.date} {exp.creator_name ? <span>• <span className="text-blue-600 font-black px-1 border border-blue-600">by {exp.creator_name}</span></span> : ''}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-lg font-black text-black">{formatCurrency(exp.amount)}</p>
+                                  <p className="text-[10px] text-black bg-[#FFD700] border border-black px-1.5 py-0.5 mt-1 font-bold inline-block uppercase tracking-tight shadow-[1px_1px_0_0_rgba(0,0,0,1)]">Split equally</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      ) : (
+                        // Settle Up View
+                        groupSettlements.length === 0 ? (
+                          <div className="py-24 text-center">
+                            <div className="w-20 h-20 bg-green-50 text-green-500 flex items-center justify-center mx-auto mb-6 border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] text-3xl">
+                              🎉
+                            </div>
+                            <p className="text-xl font-black text-black mb-2">You're all settled up!</p>
+                            <p className="text-sm font-bold text-gray-500">Nobody owes anything in this group right now.</p>
+                          </div>
+                        ) : (
+                          <div className="p-8">
+                            <h4 className="text-sm font-black text-black uppercase tracking-widest mb-6 py-2 border-y-2 border-black bg-[#FFD700] px-4 inline-block">Suggested Settlements</h4>
+                            <div className="space-y-4">
+                              {groupSettlements.map((settle, i) => (
+                                <div key={i} className="bg-white p-5 border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] rounded-none flex items-center justify-between hover:-translate-y-1 hover:shadow-[6px_6px_0_0_rgba(0,0,0,1)] transition-all">
+                                  <div className="flex items-center gap-4">
+                                    <div className="flex flex-col items-center">
+                                      <div className="w-10 h-10 border-2 border-black bg-rose-50 text-rose-700 font-black flex items-center justify-center text-sm shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                                        {settle.from_user_name.charAt(0)}
+                                      </div>
+                                    </div>
+                                    <div className="text-black font-black text-sm uppercase tracking-widest px-2 pb-1 border-b-2 border-black">
+                                      Pays
+                                      <span className="inline-block ml-2 w-0 h-0 border-y-4 border-y-transparent border-l-[6px] border-l-black relative top-0.5"></span>
+                                    </div>
+                                    <div className="flex flex-col items-center">
+                                      <div className="w-10 h-10 border-2 border-black bg-emerald-50 text-emerald-700 font-black flex items-center justify-center text-sm shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                                        {settle.to_user_name.charAt(0)}
+                                      </div>
+                                    </div>
+                                    <div className="ml-4">
+                                      <p className="text-sm font-black text-black uppercase">
+                                        {settle.from_user_name} <span className="text-rose-600 font-bold px-1 bg-rose-50 border border-rose-200">owes</span> {settle.to_user_name}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="text-right pl-6 border-l-2 border-dashed border-gray-300">
+                                    <p className="text-2xl font-black text-black">{formatCurrency(settle.amount)}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
             </div>
-
-            {/* Monthly Trends */}
-            {(analytics || []).length > 0 && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <h3 className="text-lg font-medium text-gray-900">📈 Monthly Trends</h3>
-                </div>
-                <div className="p-6">
-                  <div className="space-y-6">
-                    {(analytics || []).map(month => (
-                      <div key={month.month} className="border-b border-gray-100 pb-4 last:border-b-0">
-                        <div className="flex items-center justify-between mb-3">
-                          <h4 className="font-medium text-gray-900">{month.month}</h4>
-                          <div className="text-right">
-                            <p className="font-semibold text-gray-900">{formatCurrency(month.total)}</p>
-                            <p className="text-sm text-gray-500">{month.expense_count} expenses</p>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                          {(month.categories || []).slice(0, 6).map(cat => (
-                            <div key={cat.category} className="text-sm">
-                              <div className="flex items-center justify-between">
-                                <span className="text-gray-600 truncate">{cat.category}</span>
-                                <span className="font-medium text-gray-900 ml-2">{formatCurrency(cat.total)}</span>
-                              </div>
-                              <div className="w-full bg-gray-200 rounded-full h-1 mt-1">
-                                <div 
-                                  className="bg-indigo-600 h-1 rounded-full" 
-                                  style={{width: `${cat.percentage}%`}}
-                                ></div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         )}
-      </main>
 
       {/* Expense Details Modal */}
       {showExpenseDetails && selectedExpense && (
@@ -2227,7 +3225,7 @@ function App() {
                   <h4 className="text-sm font-medium text-gray-800 mb-3">📄 Receipt Image</h4>
                   <div className="text-center">
                     <img 
-                      src={`${API}${selectedExpense.receipt_url}`}
+                      src={`${API}/api${selectedExpense.receipt_url}`}
                       alt="Receipt"
                       className="max-w-full h-auto rounded border mx-auto"
                       style={{ maxHeight: '400px' }}
@@ -2303,6 +3301,371 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* ─── BUDGETS TAB ─── */}
+      {activeTab === 'budgets' && (
+        <div className="space-y-6 animate-[slideDown_0.3s_ease-out]">
+            <div className="bg-white rounded-none shadow-[8px_8px_0_0_rgba(0,0,0,1)] border-2 border-black p-6 md:p-8">
+              <div className="flex items-center space-x-4 mb-8">
+                <div className="w-14 h-14 bg-[#10b981] border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] flex items-center justify-center">
+                  <svg className="w-8 h-8 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="2.5" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" /></svg>
+                </div>
+                <div>
+                  <h2 className="text-3xl font-black text-black tracking-tighter uppercase">Monthly Budgets</h2>
+                  <p className="text-sm font-bold text-gray-700 mt-1 uppercase tracking-widest">Set spending limits and track in real-time</p>
+                </div>
+              </div>
+
+              <form onSubmit={createBudget} className="flex flex-wrap gap-4 items-end p-5 bg-[#f0f9ff] border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] mb-8">
+                <div className="flex-1 min-w-[160px]">
+                  <label className="block text-xs font-black text-black uppercase tracking-widest mb-2">Category</label>
+                  <select required value={budgetForm.category} onChange={e => setBudgetForm(p => ({ ...p, category: e.target.value }))}
+                    className="block w-full border-2 border-black bg-white rounded-none px-4 py-3 text-sm font-bold focus:ring-0 focus:outline-none focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)] transition-shadow appearance-none">
+                    <option value="">SELECT CATEGORY</option>
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div className="flex-1 min-w-[120px]">
+                  <label className="block text-xs font-black text-black uppercase tracking-widest mb-2">Monthly Limit (₹)</label>
+                  <input type="number" required min="1" step="0.01" placeholder="5000"
+                    value={budgetForm.amount} onChange={e => setBudgetForm(p => ({ ...p, amount: e.target.value }))}
+                    className="block w-full border-2 border-black bg-white rounded-none px-4 py-3 text-sm font-bold focus:ring-0 focus:outline-none focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)] transition-shadow" />
+                </div>
+                <button type="submit" className="px-6 py-3 bg-[#FFD700] text-black border-2 border-black font-black uppercase tracking-widest hover:bg-[#F2C900] hover:-translate-y-1 shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:translate-y-px active:shadow-[2px_2px_0_0_rgba(0,0,0,1)] transition-all">
+                  + Set Budget
+                </button>
+              </form>
+
+              {budgetLoading ? (
+                <div className="text-center py-8 text-gray-500">Loading budgets...</div>
+              ) : budgets.length === 0 ? (
+                <div className="text-center py-12">
+                  <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M12 7h.01" /></svg>
+                  <p className="text-gray-500">No budgets set yet. Add one above to get started!</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {budgets.map(b => (
+                    <div key={b.id} className={`p-5 border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] transition-all bg-white hover:-translate-y-1 hover:shadow-[6px_6px_0_0_rgba(0,0,0,1)]`}>
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <span className="text-lg font-black text-black uppercase">{b.category}</span>
+                          {b.is_exceeded && <span className="ml-3 text-xs font-black text-white bg-red-500 px-2 py-1 border border-black shadow-[1px_1px_0_0_rgba(0,0,0,1)]">EXCEEDED</span>}
+                          {!b.is_exceeded && b.percentage >= 80 && <span className="ml-3 text-xs font-black text-black bg-[#FFD700] px-2 py-1 border border-black shadow-[1px_1px_0_0_rgba(0,0,0,1)] tracking-widest">WARNING</span>}
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <span className="text-xl font-black text-black">₹{(b.spent || 0).toLocaleString('en-IN', {maximumFractionDigits: 0})} <span className="text-sm font-bold text-gray-500">/ ₹{b.amount.toLocaleString('en-IN', {maximumFractionDigits: 0})}</span></span>
+                          <button onClick={() => deleteBudget(b.id)} className="w-8 h-8 flex items-center justify-center bg-white border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:bg-red-500 hover:text-white active:translate-y-px active:shadow-none transition-all text-black">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                        </div>
+                      </div>
+                      <div className="w-full bg-white border-2 border-black h-5 shadow-inner">
+                        <div className={`h-full border-r-2 border-black transition-all duration-500 ${b.is_exceeded ? 'bg-red-500' : b.percentage >= 80 ? 'bg-[#FFD700]' : 'bg-[#10b981]'}`}
+                          style={{ width: `${Math.min(100, b.percentage)}%` }} />
+                      </div>
+                      <div className="flex justify-between mt-2">
+                        <span className="text-[10px] font-black uppercase text-gray-500 tracking-widest">{b.percentage}% USED</span>
+                        <span className="text-[10px] font-black uppercase text-gray-500 tracking-widest">₹{(b.remaining || 0).toLocaleString('en-IN', {maximumFractionDigits: 0})} REMAINING</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+      )}
+
+      {/* ─── RECURRING EXPENSES TAB ─── */}
+      {activeTab === 'recurring' && (() => {
+        const activeRecurring = recurringItems.filter(r => r.is_active);
+        const monthlyTotalOutflow = activeRecurring.reduce((sum, r) => {
+          const amt = parseFloat(r.amount) || 0;
+          if (r.frequency === 'monthly') return sum + amt;
+          if (r.frequency === 'yearly') return sum + (amt / 12);
+          if (r.frequency === 'weekly') return sum + (amt * 4.33);
+          if (r.frequency === 'daily') return sum + (amt * 30);
+          return sum;
+        }, 0);
+        
+        const now = new Date();
+        const next7Days = new Date();
+        next7Days.setDate(next7Days.getDate() + 7);
+        const upcomingCount = activeRecurring.filter(r => {
+          const d = new Date(r.next_date);
+          return d >= now && d <= next7Days;
+        }).length;
+
+        return (
+          <div className="space-y-6 animate-[slideDown_0.3s_ease-out]">
+              <div className="flex items-center space-x-4 mb-2">
+                <div className="w-14 h-14 bg-[#4f46e5] border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] flex items-center justify-center">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                </div>
+                <div>
+                  <h2 className="text-3xl font-black text-black tracking-tighter uppercase">Smart Subscriptions</h2>
+                  <p className="text-sm font-bold text-gray-700 tracking-widest uppercase mt-1">Track and auto-log fixed monthly outflows</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 mt-6">
+                <div className="bg-[#FFD700] border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] p-6 hover:-translate-y-1 hover:shadow-[6px_6px_0_0_rgba(0,0,0,1)] transition-all">
+                  <p className="text-xs font-black text-black uppercase tracking-widest mb-2 border-b-2 border-black pb-1 inline-block">Fixed Outflow</p>
+                  <p className="text-4xl font-black text-black tracking-tighter mt-2">{formatCurrency(monthlyTotalOutflow)}</p>
+                  <p className="text-[10px] font-bold text-gray-800 uppercase mt-2">Estimated avg / month</p>
+                </div>
+                <div className="bg-[#f472b6] border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] p-6 hover:-translate-y-1 hover:shadow-[6px_6px_0_0_rgba(0,0,0,1)] transition-all">
+                  <p className="text-xs font-black text-black uppercase tracking-widest mb-2 border-b-2 border-black pb-1 inline-block">Due in 7 Days</p>
+                  <p className="text-4xl font-black text-black tracking-tighter mt-2">{upcomingCount} <span className="text-lg text-black font-black uppercase tracking-widest">bills</span></p>
+                  <p className="text-[10px] font-bold text-gray-900 uppercase mt-2">Action required soon</p>
+                </div>
+                <div className="bg-[#10b981] border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] p-6 hover:-translate-y-1 hover:shadow-[6px_6px_0_0_rgba(0,0,0,1)] transition-all">
+                  <p className="text-xs font-black text-black uppercase tracking-widest mb-2 border-b-2 border-black pb-1 inline-block">Active Subs</p>
+                  <p className="text-4xl font-black text-black tracking-tighter mt-2">{activeRecurring.length}</p>
+                  <p className="text-[10px] font-bold text-gray-900 uppercase mt-2">Out of {recurringItems.length} total</p>
+                </div>
+              </div>
+
+              <div className="bg-white border-2 border-black shadow-[8px_8px_0_0_rgba(0,0,0,1)] p-6 md:p-8">
+                <div className="flex justify-between items-center mb-8 border-b-2 border-black pb-4">
+                  <h3 className="text-xl font-black text-black uppercase tracking-tight flex items-center gap-3">
+                    <span className="w-4 h-4 bg-[#FFD700] border-2 border-black shadow-[1px_1px_0_0_rgba(0,0,0,1)]"></span> Your Subscriptions
+                  </h3>
+                  <button 
+                    onClick={() => setShowAddRecurring(!showAddRecurring)}
+                    className="px-5 py-2.5 bg-[#4f46e5] text-white border-2 border-black text-xs font-black uppercase tracking-widest hover:bg-[#4338ca] shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:-translate-y-px transition-all active:translate-y-px active:shadow-none"
+                  >
+                    {showAddRecurring ? 'Cancel' : '+ New Bill'}
+                  </button>
+                </div>
+
+                {showAddRecurring && (
+                  <form onSubmit={createRecurring} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-5 bg-[#f0f9ff] p-6 border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] mb-8">
+                    <div className="lg:col-span-2">
+                      <label className="block text-[10px] font-black text-black uppercase tracking-widest mb-2">Title</label>
+                      <input type="text" required placeholder="NETFLIX, RENT..." value={recurringForm.title} onChange={e => setRecurringForm(p => ({ ...p, title: e.target.value }))} className="w-full border-2 border-black rounded-none px-3 py-3 text-sm font-bold focus:ring-0 focus:outline-none focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)]" />
+                    </div>
+                    <div className="lg:col-span-1">
+                      <label className="block text-[10px] font-black text-black uppercase tracking-widest mb-2">Amount</label>
+                      <input type="number" required min="1" step="0.01" placeholder="499" value={recurringForm.amount} onChange={e => setRecurringForm(p => ({ ...p, amount: e.target.value }))} className="w-full border-2 border-black rounded-none px-3 py-3 text-sm font-bold focus:ring-0 focus:outline-none focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)]" />
+                    </div>
+                    <div className="lg:col-span-1">
+                      <label className="block text-[10px] font-black text-black uppercase tracking-widest mb-2">Category</label>
+                      <select required value={recurringForm.category} onChange={e => setRecurringForm(p => ({ ...p, category: e.target.value }))} className="w-full border-2 border-black rounded-none px-3 py-3 text-sm font-bold focus:ring-0 focus:outline-none focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)] bg-white">
+                        <option value="" disabled>SELECT</option>
+                        {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div className="lg:col-span-1">
+                      <label className="block text-[10px] font-black text-black uppercase tracking-widest mb-2">Cycle</label>
+                      <select required value={recurringForm.frequency} onChange={e => setRecurringForm(p => ({ ...p, frequency: e.target.value }))} className="w-full border-2 border-black rounded-none px-3 py-3 text-sm font-bold focus:ring-0 focus:outline-none focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)] bg-white uppercase">
+                        <option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option>
+                      </select>
+                    </div>
+                    <div className="lg:col-span-1">
+                      <label className="block text-[10px] font-black text-black uppercase tracking-widest mb-2">Next Date</label>
+                      <input type="date" required value={recurringForm.next_date} onChange={e => setRecurringForm(p => ({ ...p, next_date: e.target.value }))} className="w-full border-2 border-black rounded-none px-2 py-3 text-sm font-bold focus:ring-0 focus:outline-none focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)] bg-white text-black" />
+                    </div>
+                    <div className="md:col-span-2 lg:col-span-6 flex justify-end mt-4">
+                      <button type="submit" className="w-full md:w-auto px-8 py-3 bg-[#FFD700] text-black border-2 border-black text-xs font-black uppercase tracking-widest hover:bg-[#F2C900] transition-all shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:translate-y-px active:shadow-[2px_2px_0_0_rgba(0,0,0,1)]">Save Subscription</button>
+                    </div>
+                  </form>
+                )}
+
+                {recurringLoading ? (
+                  <div className="py-12 flex justify-center"><div className="w-10 h-10 border-4 border-black border-t-[#FFD700] rounded-none animate-spin shadow-[2px_2px_0_0_rgba(0,0,0,1)]"></div></div>
+                ) : recurringItems.length === 0 ? (
+                  <div className="text-center py-16 opacity-100 border-2 border-dashed border-black bg-gray-50">
+                    <div className="text-5xl mb-4">📅</div>
+                    <p className="text-lg font-black text-black uppercase tracking-widest">No subscriptions found</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {recurringItems.map(r => (
+                      <div key={r.id} className={`flex flex-col sm:flex-row sm:items-center justify-between p-5 border-2 border-black transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0_0_rgba(0,0,0,1)] ${r.is_active ? 'bg-white shadow-[2px_2px_0_0_rgba(0,0,0,1)]' : 'bg-gray-100 opacity-80'}`}>
+                        <div className="flex items-center gap-5 mb-4 sm:mb-0">
+                          <div className={`w-14 h-14 border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] flex items-center justify-center text-2xl ${r.is_active ? 'bg-[#FFD700] text-black' : 'bg-gray-300 text-gray-500'}`}>
+                            {r.category === 'Entertainment' ? '🎬' : r.category === 'Bills & Utilities' ? '⚡' : r.category === 'Food & Dining' ? '🍔' : '💳'}
+                          </div>
+                          <div>
+                            <p className="font-black text-xl text-black uppercase tracking-tight">{r.title}</p>
+                            <p className="text-xs font-bold text-gray-600 uppercase tracking-widest flex items-center gap-2 mt-1">
+                              {r.frequency} • NEXT: <span className={new Date(r.next_date) <= next7Days ? 'text-white bg-red-500 px-1 border border-black' : 'text-black bg-blue-100 px-1 border border-black'}>{new Date(r.next_date).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between sm:justify-end gap-6">
+                          <span className="font-black text-2xl text-black">{formatCurrency(parseFloat(r.amount))}</span>
+                          <div className="flex items-center gap-3">
+                            <button onClick={() => toggleRecurring(r.id)} className={`text-[10px] px-3 py-2 border-2 border-black font-black uppercase tracking-widest shadow-[1px_1px_0_0_rgba(0,0,0,1)] transition-all active:translate-y-px active:shadow-none ${r.is_active ? 'bg-[#10b981] text-black hover:bg-[#0ea5e9]' : 'bg-white text-black hover:bg-gray-200'}`}>
+                              {r.is_active ? 'Active' : 'Paused'}
+                            </button>
+                            <button onClick={() => deleteRecurring(r.id)} className="w-8 h-8 flex items-center justify-center bg-white border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:bg-red-500 hover:text-white active:translate-y-px active:shadow-none transition-all text-black">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+        );
+      })()}
+
+      {/* ─── SAVINGS GOALS TAB (GAMIFICATION) ─── */}
+      {activeTab === 'goals' && (
+        <div className="animate-[slideDown_0.3s_ease-out]">
+          <div className="flex items-center space-x-4 mb-8">
+            <div className="w-14 h-14 bg-[#f472b6] border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] flex items-center justify-center">
+              <span className="text-3xl text-black">🎯</span>
+            </div>
+            <div className="flex-1">
+              <h2 className="text-3xl font-black text-black tracking-tighter uppercase">Savings Goals</h2>
+              <p className="text-sm font-bold text-gray-700 tracking-widest uppercase mt-1">Track progress toward your dreams</p>
+            </div>
+            <button 
+              onClick={() => setShowAddGoal(!showAddGoal)}
+              className="px-6 py-3 bg-[#4f46e5] text-white border-2 border-black text-xs font-black uppercase tracking-widest hover:bg-[#4338ca] shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:-translate-y-px transition-all active:translate-y-px active:shadow-[2px_2px_0_0_rgba(0,0,0,1)] flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="3" d="M12 4v16m8-8H4"/></svg>
+              {showAddGoal ? 'CANCEL' : 'NEW GOAL'}
+            </button>
+          </div>
+
+          {showAddGoal && (
+            <div className="bg-[#f0f9ff] border-2 border-black shadow-[8px_8px_0_0_rgba(0,0,0,1)] p-8 mb-10 animate-[slideDown_0.2s_ease-out]">
+              <h3 className="text-lg font-black text-black uppercase tracking-widest mb-6 border-b-2 border-black pb-2 inline-block">Create Target</h3>
+              <form onSubmit={createGoal} className="grid grid-cols-1 md:grid-cols-6 gap-6 items-end">
+                <div className="md:col-span-1">
+                  <label className="block text-[10px] font-black text-black uppercase tracking-widest mb-2">Icon</label>
+                  <div className="flex gap-2 p-2 bg-white border-2 border-black h-[50px] items-center justify-center overflow-x-auto no-scrollbar shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                    {['💰', '✈️', '🚗', '💻', '🏠', '🎓'].map(emoji => (
+                      <button key={emoji} type="button" onClick={() => setGoalForm(p => ({...p, icon: emoji}))} className={`w-8 h-8 flex items-center justify-center text-xl transition-all ${goalForm.icon === emoji ? 'bg-[#FFD700] border-2 border-black shadow-[1px_1px_0_0_rgba(0,0,0,1)] scale-110' : 'hover:scale-110'}`}>
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-[10px] font-black text-black uppercase tracking-widest mb-2">Goal Title</label>
+                  <input type="text" required value={goalForm.title} onChange={e => setGoalForm(p => ({...p, title: e.target.value}))} className="w-full bg-white border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] rounded-none px-4 py-3 text-sm font-bold focus:outline-none focus:ring-0 placeholder-gray-400 text-black uppercase" placeholder="DREAM VACATION..." />
+                </div>
+                <div className="md:col-span-1">
+                  <label className="block text-[10px] font-black text-black uppercase tracking-widest mb-2">Amount (₹)</label>
+                  <input type="number" required min="1" step="0.01" value={goalForm.target_amount} onChange={e => setGoalForm(p => ({...p, target_amount: e.target.value}))} className="w-full bg-white border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] rounded-none px-4 py-3 text-sm font-bold focus:outline-none focus:ring-0 placeholder-gray-400 text-black" placeholder="50000" />
+                </div>
+                <div className="md:col-span-1">
+                  <label className="block text-[10px] font-black text-black uppercase tracking-widest mb-2">Color</label>
+                  <div className="flex gap-2 p-2 bg-white border-2 border-black h-[50px] items-center justify-center shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                    {[
+                      { id: 'indigo', bg: 'bg-[#4f46e5]' },
+                      { id: 'emerald', bg: 'bg-[#10b981]' },
+                      { id: 'rose', bg: 'bg-[#f43f5e]' },
+                      { id: 'amber', bg: 'bg-[#FFD700]' },
+                      { id: 'cyan', bg: 'bg-[#06b6d4]' },
+                      { id: 'purple', bg: 'bg-[#a855f7]' }
+                    ].map(({id, bg}) => (
+                      <button key={id} type="button" onClick={() => setGoalForm(p => ({...p, color: id}))} className={`w-5 h-5 border-2 border-black ${bg} ${goalForm.color === id ? 'shadow-[2px_2px_0_0_rgba(0,0,0,1)] scale-125' : ''} transition-all`}></button>
+                    ))}
+                  </div>
+                </div>
+                <div className="md:col-span-1 flex items-end">
+                  <button type="submit" className="w-full h-[50px] bg-[#FFD700] text-black border-2 border-black text-xs font-black uppercase tracking-widest hover:bg-[#F2C900] shadow-[2px_2px_0_0_rgba(0,0,0,1)] transition-all active:translate-y-px active:shadow-none">START!</button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {goalsLoading ? (
+            <div className="py-20 flex justify-center"><div className="w-10 h-10 border-4 border-black border-t-[#f472b6] rounded-none animate-spin shadow-[2px_2px_0_0_rgba(0,0,0,1)]"></div></div>
+          ) : goals.length === 0 ? (
+            <div className="text-center py-24 bg-[#fffbfa] border-4 border-black border-dashed shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+              <div className="text-6xl mb-6">🏝️</div>
+              <h3 className="text-2xl font-black text-black uppercase tracking-tighter mb-2">No goals set yet!</h3>
+              <p className="text-sm font-bold text-gray-700 uppercase tracking-widest mb-8 max-w-sm mx-auto">Visualizing your target helps you save money faster.</p>
+              <button onClick={() => setShowAddGoal(true)} className="px-8 py-4 bg-[#FFD700] text-black border-2 border-black text-xs font-black uppercase tracking-widest hover:bg-[#F2C900] shadow-[4px_4px_0_0_rgba(0,0,0,1)] transition-all active:translate-y-px active:shadow-[2px_2px_0_0_rgba(0,0,0,1)]">CREATE FIRST GOAL</button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {goals.map(goal => {
+                const colorTheme = {
+                  indigo: { bgClasses: 'bg-[#c7d2fe]', barColor: 'bg-[#4f46e5]', text: 'text-black' },
+                  emerald: { bgClasses: 'bg-[#a7f3d0]', barColor: 'bg-[#10b981]', text: 'text-black' },
+                  rose: { bgClasses: 'bg-[#fecdd3]', barColor: 'bg-[#f43f5e]', text: 'text-black' },
+                  amber: { bgClasses: 'bg-[#fef08a]', barColor: 'bg-[#FFD700]', text: 'text-black' },
+                  cyan: { bgClasses: 'bg-[#a5f3fc]', barColor: 'bg-[#06b6d4]', text: 'text-black' },
+                  purple: { bgClasses: 'bg-[#e9d5ff]', barColor: 'bg-[#a855f7]', text: 'text-black' },
+                }[goal.color] || { bgClasses: 'bg-white', barColor: 'bg-black', text: 'text-black' };
+
+                const progress = Math.min(100, Math.round((goal.current_amount / goal.target_amount) * 100));
+                const isComplete = progress >= 100;
+
+                return (
+                  <div key={goal.id} className={`bg-white border-4 border-black p-6 shadow-[8px_8px_0_0_rgba(0,0,0,1)] hover:-translate-y-2 hover:shadow-[12px_12px_0_0_rgba(0,0,0,1)] transition-all flex flex-col relative group`}>
+                    <button onClick={() => deleteGoal(goal.id)} className="absolute top-4 right-4 w-10 h-10 border-2 border-black bg-white text-black flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500 hover:text-white shadow-[2px_2px_0_0_rgba(0,0,0,1)] transition-all active:translate-y-px active:shadow-none z-10">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                    
+                    <div className="flex items-center gap-5 mb-8">
+                      <div className={`w-16 h-16 border-2 border-black flex items-center justify-center text-3xl shadow-[4px_4px_0_0_rgba(0,0,0,1)] ${colorTheme.bgClasses}`}>
+                        {isComplete ? '🎉' : goal.icon || '💸'}
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-black text-black uppercase tracking-tight">{goal.title}</h3>
+                        <p className="text-xs font-bold text-gray-700 uppercase tracking-widest mt-1 bg-gray-100 border border-black inline-block px-2 py-0.5">{progress}% {isComplete ? 'COMPLETED!' : 'REACHED'}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex-1">
+                      <div className="flex justify-between items-end mb-3">
+                        <span className="text-3xl font-black text-black tracking-tighter">{formatCurrency(goal.current_amount)}</span>
+                        <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest pb-1">OF {formatCurrency(goal.target_amount)}</span>
+                      </div>
+                      <div className="w-full h-6 bg-white border-2 border-black overflow-hidden mb-6 relative">
+                        <div className={`absolute left-0 top-0 bottom-0 border-r-2 border-black ${colorTheme.barColor} transition-all duration-1000 ease-out`} style={{width: `${progress}%`}}></div>
+                      </div>
+                    </div>
+
+                    {!isComplete ? (
+                      <form onSubmit={contributeToGoal} className="mt-auto">
+                        <div className="flex gap-3">
+                          <input 
+                            type="number" 
+                            min="1" 
+                            step="0.01" 
+                            placeholder="AMOUNT..." 
+                            value={contributionForm.goalId === goal.id ? contributionForm.amount : ''}
+                            onChange={e => setContributionForm({ goalId: goal.id, amount: e.target.value })}
+                            className="w-full bg-white border-2 border-black rounded-none px-4 py-3 text-xs font-bold focus:outline-none focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)] uppercase text-black" 
+                          />
+                          <button 
+                            type="submit" 
+                            disabled={contributionForm.goalId !== goal.id || !contributionForm.amount}
+                            className={`px-6 py-3 border-2 border-black text-xs font-black uppercase tracking-widest transition-all ${contributionForm.goalId === goal.id && contributionForm.amount ? 'bg-[#FFD700] text-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:bg-[#F2C900] hover:-translate-y-px active:translate-y-px active:shadow-none' : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-[2px_2px_0_0_rgba(0,0,0,1)]'}`}
+                          >
+                            ADD
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <div className="mt-auto py-3 bg-[#10b981] border-2 border-black text-center shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+                        <span className="text-sm font-black text-black uppercase tracking-widest flex items-center justify-center gap-2">
+                          <svg className="w-5 h-5 text-black" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                          GOAL REACHED!
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+      </main>
+      </div>
     </div>
   );
 }

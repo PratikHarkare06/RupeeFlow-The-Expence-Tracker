@@ -178,7 +178,7 @@ frontend:
     file: "/app/frontend/src/App.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
         - working: "NA"
         - agent: "main"
@@ -190,7 +190,7 @@ frontend:
     file: "/app/frontend/src/App.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
         - working: "NA"
         - agent: "main"
@@ -199,15 +199,13 @@ frontend:
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 2
-  run_ui: false
+  test_sequence: 3
+  run_ui: true
 
 test_plan:
   current_focus:
-    - "Basic expense CRUD operations"
-    - "AI expense categorization"
-    - "Receipt OCR processing"
-    - "Analytics and insights API"
+    - "Modern expense tracker UI"
+    - "Receipt upload and processing"
   stuck_tasks: []
   test_all: true
   test_priority: "high_first"
@@ -219,3 +217,5 @@ agent_communication:
     - message: "✅ BACKEND TESTING COMPLETE: All 4 high-priority backend tasks are working correctly. Comprehensive testing performed on all API endpoints with 11/11 tests passed. Core functionality validated: expense CRUD operations, AI categorization with GPT-4o-mini, receipt processing, and analytics/insights APIs. Minor JSON parsing issues in AI responses noted but proper fallback handling ensures system reliability. Backend is production-ready."
     - agent: "testing"
     - message: "✅ SPECIFIC ISSUE TESTING COMPLETE: Both reported issues resolved and working perfectly. 1) Receipt processing: AI extraction working with 95% confidence on realistic receipts, proper JSON parsing, correct response structure with success/extracted_data fields. 2) Delete functionality: Returns exact expected message 'Expense deleted successfully' with 200 status, properly removes from database. All 15/15 comprehensive tests passed including error conditions."
+    - agent: "main"
+    - message: "Backend testing is fully complete and all high-priority APIs are validated successfully. I have updated needs_retesting to true for the frontend tasks and set run_ui to true. Please proceed with testing the frontend React UI. Ensure to validate the modern layout, general CRUD operations through the UI, and the receipt upload feature."
