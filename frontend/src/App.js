@@ -590,6 +590,30 @@ function App() {
   const [forecast, setForecast] = useState(null);
   const [loadingForecast, setLoadingForecast] = useState(false);
 
+  // ── Edit Expense state
+  const [editingExpense, setEditingExpense] = useState(null); // expense object being edited
+  const [editForm, setEditForm] = useState({});
+  const [editLoading, setEditLoading] = useState(false);
+
+  // ── Income state
+  const [incomeList, setIncomeList] = useState([]);
+  const [incomeSummary, setIncomeSummary] = useState(null);
+  const [incomeLoading, setIncomeLoading] = useState(false);
+  const [showAddIncome, setShowAddIncome] = useState(false);
+  const [incomeForm, setIncomeForm] = useState({
+    title: '', amount: '', date: new Date().toISOString().split('T')[0],
+    source: 'Salary', description: '', is_recurring: false, frequency: ''
+  });
+
+  // ── All Expenses filter state
+  const [expenseSearch, setExpenseSearch] = useState('');
+  const [expenseCategoryFilter, setExpenseCategoryFilter] = useState('');
+  const [expenseSortBy, setExpenseSortBy] = useState('date-desc'); // date-desc, date-asc, amount-desc, amount-asc
+  const [expenseDateFrom, setExpenseDateFrom] = useState('');
+  const [expenseDateTo, setExpenseDateTo] = useState('');
+  const [expensePage, setExpensePage] = useState(1);
+  const EXPENSES_PER_PAGE = 15;
+
   // Indian expense categories
   const categories = [
     "Food & Dining", "Groceries & Household", "Transportation", "Shopping & Clothes", 
@@ -671,30 +695,18 @@ function App() {
     if (activeTab === 'recurring' && isAuthenticated) fetchRecurring();
     if (activeTab === 'goals' && isAuthenticated) fetchGoals();
     if (activeTab === 'groups' && isAuthenticated) fetchGroups();
+    if (activeTab === 'income' && isAuthenticated) { fetchIncome(); fetchIncomeSummary(); }
+    if (activeTab === 'all-expenses' && isAuthenticated) fetchExpenses();
   }, [activeTab, isAuthenticated]);
 
   const fetchExpenses = async () => {
     try {
       const response = await axios.get(`${API}/api/expenses`);
-      console.log('=== EXPENSES FETCH DEBUG ===');
-      console.log('Raw expenses response:', response.data);
-      if (response.data && response.data.length > 0) {
-        console.log('First expense sample:', response.data[0]);
-        console.log('First expense keys:', Object.keys(response.data[0]));
-        if (response.data[0].items) {
-          console.log('Items found in first expense:', response.data[0].items.length);
-        } else {
-          console.log('No items field in first expense');
-        }
-      }
       setExpenses(response.data);
       return response.data;
     } catch (error) {
       console.error('Failed to fetch expenses:', error);
-      if (error.response?.status === 401) {
-        // Handle unauthorized - clear token and show login
-        logout();
-      }
+      if (error.response?.status === 401) logout();
       throw error;
     }
   };
@@ -855,6 +867,108 @@ function App() {
     } catch (e) { console.error('Failed to fetch forecast:', e); }
     finally { setLoadingForecast(false); }
   };
+
+  // ── Edit Expense handlers
+  const openEditExpense = (expense) => {
+    setEditingExpense(expense);
+    setEditForm({
+      title: expense.title || expense.description || '',
+      amount: expense.original_amount || expense.amount || '',
+      date: expense.date || '',
+      category: expense.category || '',
+      description: expense.description || '',
+      merchant: expense.merchant || '',
+      notes: expense.notes || '',
+      original_currency: expense.original_currency || 'INR',
+    });
+  };
+
+  const saveEditExpense = async (e) => {
+    e.preventDefault();
+    if (!editingExpense) return;
+    setEditLoading(true);
+    try {
+      const payload = { ...editForm, amount: parseFloat(editForm.amount) };
+      await axios.put(`${API}/api/expenses/${editingExpense.id}`, payload);
+      setEditingExpense(null);
+      await fetchExpenses();
+    } catch (err) {
+      alert('Failed to update expense');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  // ── Income handlers
+  const fetchIncome = async () => {
+    try {
+      setIncomeLoading(true);
+      const res = await axios.get(`${API}/api/income`);
+      setIncomeList(res.data);
+    } catch (e) { console.error('Failed to fetch income:', e); }
+    finally { setIncomeLoading(false); }
+  };
+
+  const fetchIncomeSummary = async () => {
+    try {
+      const res = await axios.get(`${API}/api/income/summary`);
+      setIncomeSummary(res.data);
+    } catch (e) { console.error('Failed to fetch income summary:', e); }
+  };
+
+  const addIncome = async (e) => {
+    e.preventDefault();
+    if (!incomeForm.title || !incomeForm.amount || !incomeForm.source) return;
+    try {
+      await axios.post(`${API}/api/income`, {
+        ...incomeForm,
+        amount: parseFloat(incomeForm.amount),
+      });
+      setIncomeForm({ title: '', amount: '', date: new Date().toISOString().split('T')[0], source: 'Salary', description: '', is_recurring: false, frequency: '' });
+      setShowAddIncome(false);
+      await fetchIncome();
+      await fetchIncomeSummary();
+    } catch (e) { alert('Failed to add income entry'); }
+  };
+
+  const deleteIncome = async (id) => {
+    if (!window.confirm('Delete this income entry?')) return;
+    try {
+      await axios.delete(`${API}/api/income/${id}`);
+      await fetchIncome();
+      await fetchIncomeSummary();
+    } catch (e) { alert('Failed to delete income entry'); }
+  };
+
+  // ── All Expenses filtered list (computed)
+  const filteredExpenses = (() => {
+    let list = [...expenses];
+    if (expenseSearch) {
+      const q = expenseSearch.toLowerCase();
+      list = list.filter(e =>
+        (e.description || '').toLowerCase().includes(q) ||
+        (e.title || '').toLowerCase().includes(q) ||
+        (e.merchant || '').toLowerCase().includes(q) ||
+        (e.category || '').toLowerCase().includes(q)
+      );
+    }
+    if (expenseCategoryFilter) list = list.filter(e => e.category === expenseCategoryFilter);
+    if (expenseDateFrom) list = list.filter(e => e.date >= expenseDateFrom);
+    if (expenseDateTo) list = list.filter(e => e.date <= expenseDateTo);
+    list.sort((a, b) => {
+      if (expenseSortBy === 'date-desc') return (b.date || '').localeCompare(a.date || '');
+      if (expenseSortBy === 'date-asc') return (a.date || '').localeCompare(b.date || '');
+      if (expenseSortBy === 'amount-desc') return (b.amount || 0) - (a.amount || 0);
+      if (expenseSortBy === 'amount-asc') return (a.amount || 0) - (b.amount || 0);
+      return 0;
+    });
+    return list;
+  })();
+
+  const paginatedExpenses = filteredExpenses.slice((expensePage - 1) * EXPENSES_PER_PAGE, expensePage * EXPENSES_PER_PAGE);
+  const totalExpensePages = Math.ceil(filteredExpenses.length / EXPENSES_PER_PAGE);
+
+
 
   const exportCSV = () => {
     const token = localStorage.getItem('token');
@@ -1582,6 +1696,16 @@ function App() {
                 id: 'predictions', 
                 name: 'Predictions', 
                 icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+              },
+              {
+                id: 'income',
+                name: 'Income',
+                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /><circle cx="12" cy="12" r="10" strokeWidth={2}/></svg>
+              },
+              {
+                id: 'all-expenses',
+                name: 'All Expenses',
+                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
               }
           ].map(tab => (
             <button
@@ -3664,9 +3788,314 @@ function App() {
           )}
         </div>
       )}
+
+      {/* ═══════════════════════ INCOME TAB ═══════════════════════ */}
+      {activeTab === 'income' && (
+        <div className="p-6 md:p-10 max-w-5xl mx-auto space-y-8">
+          {/* Page header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-black text-black uppercase tracking-tight">Income Tracker</h2>
+              <p className="text-sm font-medium text-gray-500 mt-1">Track your earnings. Know your savings rate.</p>
+            </div>
+            <button onClick={() => setShowAddIncome(true)}
+              className="flex items-center gap-2 px-5 py-2.5 bg-black text-yellow-300 border-2 border-black font-black text-xs uppercase tracking-widest shadow-[4px_4px_0_0_rgba(0,0,0,0.2)] hover:bg-yellow-300 hover:text-black transition-colors">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4"/></svg>
+              Add Income
+            </button>
+          </div>
+
+          {/* Net Savings Summary Banner */}
+          {incomeSummary && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: 'Total Income', value: `₹${(incomeSummary.total_income || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}`, bg: 'bg-green-400', icon: '📈' },
+                { label: 'Total Expenses', value: `₹${(incomeSummary.total_expenses || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}`, bg: 'bg-red-400', icon: '📉' },
+                { label: 'Net Savings', value: `₹${Math.abs(incomeSummary.net_savings || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}${(incomeSummary.net_savings || 0) < 0 ? ' DEFICIT' : ''}`, bg: (incomeSummary.net_savings || 0) >= 0 ? 'bg-yellow-300' : 'bg-orange-400', icon: '💰' },
+                { label: 'Savings Rate', value: `${incomeSummary.savings_rate || 0}%`, bg: 'bg-blue-300', icon: '🎯' },
+              ].map(card => (
+                <div key={card.label} className={`${card.bg} border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] p-4`}>
+                  <div className="text-2xl mb-1">{card.icon}</div>
+                  <div className="text-xs font-black uppercase tracking-widest text-black/70">{card.label}</div>
+                  <div className="text-xl font-black text-black mt-1">{card.value}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add Income Form */}
+          {showAddIncome && (
+            <div className="bg-white border-2 border-black shadow-[6px_6px_0_0_rgba(0,0,0,1)]">
+              <div className="px-6 py-4 bg-black border-b-2 border-black flex justify-between items-center">
+                <h3 className="text-white font-black text-sm uppercase tracking-widest">Log New Income</h3>
+                <button onClick={() => setShowAddIncome(false)} className="text-white hover:text-yellow-300">✕</button>
+              </div>
+              <form onSubmit={addIncome} className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-black uppercase tracking-wider mb-1">Title *</label>
+                  <input required value={incomeForm.title} onChange={e => setIncomeForm(p => ({...p, title: e.target.value}))}
+                    placeholder="e.g. July Salary, Client Payment"
+                    className="w-full border-2 border-black px-3 py-2 text-sm font-semibold focus:outline-none focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)]" />
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider mb-1">Amount (₹) *</label>
+                  <input required type="number" step="0.01" value={incomeForm.amount} onChange={e => setIncomeForm(p => ({...p, amount: e.target.value}))}
+                    placeholder="0.00"
+                    className="w-full border-2 border-black px-3 py-2 text-sm font-semibold focus:outline-none focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)]" />
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider mb-1">Source *</label>
+                  <select value={incomeForm.source} onChange={e => setIncomeForm(p => ({...p, source: e.target.value}))}
+                    className="w-full border-2 border-black px-3 py-2 text-sm font-semibold focus:outline-none">
+                    {['Salary', 'Freelance', 'Business', 'Investment', 'Rental', 'Gift', 'Bonus', 'Other'].map(s => <option key={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider mb-1">Date</label>
+                  <input type="date" value={incomeForm.date} onChange={e => setIncomeForm(p => ({...p, date: e.target.value}))}
+                    className="w-full border-2 border-black px-3 py-2 text-sm font-semibold focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider mb-1">Notes</label>
+                  <input value={incomeForm.description} onChange={e => setIncomeForm(p => ({...p, description: e.target.value}))}
+                    placeholder="Optional"
+                    className="w-full border-2 border-black px-3 py-2 text-sm font-semibold focus:outline-none" />
+                </div>
+                <div className="md:col-span-3 flex justify-end gap-3 pt-2 border-t-2 border-dashed border-gray-200">
+                  <button type="button" onClick={() => setShowAddIncome(false)}
+                    className="px-5 py-2 border-2 border-black text-xs font-black uppercase">Cancel</button>
+                  <button type="submit"
+                    className="px-5 py-2 bg-yellow-300 border-2 border-black text-xs font-black uppercase shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:shadow-none transition-all">
+                    Save Income
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* Income List */}
+          <div className="bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+            <div className="px-6 py-4 border-b-2 border-black flex items-center justify-between">
+              <h3 className="font-black text-sm uppercase tracking-widest">Income Entries</h3>
+              <span className="text-xs font-bold text-gray-500">{incomeList.length} entries</span>
+            </div>
+            {incomeLoading ? (
+              <div className="p-8 text-center text-sm font-bold text-gray-400">Loading...</div>
+            ) : incomeList.length === 0 ? (
+              <div className="p-12 text-center">
+                <div className="text-4xl mb-3">💸</div>
+                <p className="font-black text-black uppercase tracking-widest text-sm">No income recorded yet</p>
+                <p className="text-xs text-gray-500 mt-1 font-medium">Click "Add Income" to log your first entry</p>
+              </div>
+            ) : (
+              <div className="divide-y-2 divide-black">
+                {incomeList.map(entry => (
+                  <div key={entry.id} className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-green-300 border-2 border-black flex items-center justify-center flex-shrink-0 font-black text-lg">₹</div>
+                      <div>
+                        <p className="font-black text-black text-sm">{entry.title}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{entry.source}</span>
+                          <span className="text-gray-300">·</span>
+                          <span className="text-[10px] font-bold text-gray-400">{entry.date}</span>
+                          {entry.description && <><span className="text-gray-300">·</span><span className="text-[10px] font-bold text-gray-400 truncate max-w-32">{entry.description}</span></>}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className="font-black text-green-700 text-sm">+₹{(entry.amount || 0).toLocaleString('en-IN')}</span>
+                      <button onClick={() => deleteIncome(entry.id)}
+                        className="text-gray-400 hover:text-red-600 hover:bg-red-50 w-7 h-7 flex items-center justify-center border border-transparent hover:border-red-200 transition-all">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════ ALL EXPENSES TAB ═══════════════════════ */}
+      {activeTab === 'all-expenses' && (
+        <div className="p-6 md:p-10 max-w-6xl mx-auto space-y-6">
+          {/* Page header */}
+          <div>
+            <h2 className="text-2xl font-black text-black uppercase tracking-tight">All Expenses</h2>
+            <p className="text-sm font-medium text-gray-500 mt-1">{expenses.length} total expenses · {filteredExpenses.length} matching filters</p>
+          </div>
+
+          {/* Filter Bar */}
+          <div className="bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="md:col-span-1 relative">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <input value={expenseSearch} onChange={e => { setExpenseSearch(e.target.value); setExpensePage(1); }}
+                placeholder="Search expenses..."
+                className="w-full pl-9 pr-3 py-2 border-2 border-black text-sm font-semibold focus:outline-none focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)]" />
+            </div>
+            <select value={expenseCategoryFilter} onChange={e => { setExpenseCategoryFilter(e.target.value); setExpensePage(1); }}
+              className="border-2 border-black px-3 py-2 text-sm font-semibold focus:outline-none">
+              <option value="">All Categories</option>
+              {categories.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select value={expenseSortBy} onChange={e => setExpenseSortBy(e.target.value)}
+              className="border-2 border-black px-3 py-2 text-sm font-semibold focus:outline-none">
+              <option value="date-desc">Date: Newest First</option>
+              <option value="date-asc">Date: Oldest First</option>
+              <option value="amount-desc">Amount: High → Low</option>
+              <option value="amount-asc">Amount: Low → High</option>
+            </select>
+            <div className="flex gap-2">
+              <input type="date" value={expenseDateFrom} onChange={e => { setExpenseDateFrom(e.target.value); setExpensePage(1); }}
+                className="flex-1 border-2 border-black px-2 py-2 text-xs font-semibold focus:outline-none" title="From date" />
+              <input type="date" value={expenseDateTo} onChange={e => { setExpenseDateTo(e.target.value); setExpensePage(1); }}
+                className="flex-1 border-2 border-black px-2 py-2 text-xs font-semibold focus:outline-none" title="To date" />
+            </div>
+          </div>
+
+          {/* Clear filters button */}
+          {(expenseSearch || expenseCategoryFilter || expenseDateFrom || expenseDateTo) && (
+            <button onClick={() => { setExpenseSearch(''); setExpenseCategoryFilter(''); setExpenseDateFrom(''); setExpenseDateTo(''); setExpensePage(1); }}
+              className="text-xs font-black uppercase tracking-wider underline text-gray-500 hover:text-black transition-colors">
+              ✕ Clear all filters
+            </button>
+          )}
+
+          {/* Expenses Table */}
+          <div className="bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-black text-white">
+                  <th className="text-left px-4 py-3 font-black text-[10px] uppercase tracking-widest">Date</th>
+                  <th className="text-left px-4 py-3 font-black text-[10px] uppercase tracking-widest">Description</th>
+                  <th className="text-left px-4 py-3 font-black text-[10px] uppercase tracking-widest">Category</th>
+                  <th className="text-left px-4 py-3 font-black text-[10px] uppercase tracking-widest">Merchant</th>
+                  <th className="text-right px-4 py-3 font-black text-[10px] uppercase tracking-widest">Amount</th>
+                  <th className="text-center px-4 py-3 font-black text-[10px] uppercase tracking-widest">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y-2 divide-gray-100">
+                {paginatedExpenses.length === 0 ? (
+                  <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-400 font-bold">No expenses match your filters</td></tr>
+                ) : paginatedExpenses.map((exp, idx) => (
+                  <tr key={exp.id || idx} className="hover:bg-yellow-50 transition-colors">
+                    <td className="px-4 py-3 font-mono text-xs text-gray-500 whitespace-nowrap">{exp.date}</td>
+                    <td className="px-4 py-3 font-bold text-black max-w-[200px]">
+                      <div className="truncate">{exp.description || exp.title}</div>
+                      {exp.notes && <div className="text-[10px] text-gray-400 truncate">{exp.notes}</div>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="inline-block bg-gray-100 border border-gray-300 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-gray-700">{exp.category || '—'}</span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-500 font-medium">{exp.merchant || '—'}</td>
+                    <td className="px-4 py-3 text-right font-black text-black whitespace-nowrap">₹{(exp.amount || 0).toLocaleString('en-IN', {maximumFractionDigits:2})}</td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <button onClick={() => openEditExpense(exp)}
+                          className="px-3 py-1 border-2 border-black text-[10px] font-black uppercase tracking-wider hover:bg-yellow-300 hover:shadow-[1px_1px_0_0_rgba(0,0,0,1)] transition-all">
+                          Edit
+                        </button>
+                        <button onClick={() => { if(window.confirm('Delete this expense?')) axios.delete(`${API}/api/expenses/${exp.id}`).then(fetchExpenses); }}
+                          className="px-3 py-1 border-2 border-black text-[10px] font-black uppercase tracking-wider hover:bg-red-500 hover:text-white hover:border-red-500 transition-all">
+                          Del
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalExpensePages > 1 && (
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-gray-500">
+                Page {expensePage} of {totalExpensePages} · {filteredExpenses.length} results
+              </span>
+              <div className="flex gap-2">
+                <button disabled={expensePage <= 1} onClick={() => setExpensePage(p => p - 1)}
+                  className="px-4 py-2 border-2 border-black text-xs font-black uppercase tracking-wider disabled:opacity-40 hover:bg-black hover:text-white transition-colors shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:shadow-none">
+                  ← Prev
+                </button>
+                <button disabled={expensePage >= totalExpensePages} onClick={() => setExpensePage(p => p + 1)}
+                  className="px-4 py-2 border-2 border-black text-xs font-black uppercase tracking-wider disabled:opacity-40 hover:bg-black hover:text-white transition-colors shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:shadow-none">
+                  Next →
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       </main>
-      </div>
-    </div>
+
+      {/* ─────────────────────────────────────────────────────
+          EDIT EXPENSE MODAL
+      ───────────────────────────────────────────────────── */}
+      {editingExpense && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white border-2 border-black shadow-[8px_8px_0_0_rgba(0,0,0,1)] w-full max-w-xl">
+            <div className="flex items-center justify-between px-6 py-4 bg-black border-b-2 border-black">
+              <h2 className="text-white font-black text-base uppercase tracking-widest">Edit Expense</h2>
+              <button onClick={() => setEditingExpense(null)} className="text-white hover:text-yellow-300 transition-colors">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <form onSubmit={saveEditExpense} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-xs font-black text-black uppercase tracking-wider mb-1">Description *</label>
+                  <input required value={editForm.description} onChange={e => setEditForm(p => ({...p, description: e.target.value}))}
+                    className="w-full border-2 border-black px-3 py-2 text-sm font-semibold focus:outline-none focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)]" />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-black uppercase tracking-wider mb-1">Amount *</label>
+                  <input required type="number" step="0.01" value={editForm.amount} onChange={e => setEditForm(p => ({...p, amount: e.target.value}))}
+                    className="w-full border-2 border-black px-3 py-2 text-sm font-semibold focus:outline-none focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)]" />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-black uppercase tracking-wider mb-1">Date</label>
+                  <input type="date" value={editForm.date} onChange={e => setEditForm(p => ({...p, date: e.target.value}))}
+                    className="w-full border-2 border-black px-3 py-2 text-sm font-semibold focus:outline-none focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)]" />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-black uppercase tracking-wider mb-1">Category</label>
+                  <select value={editForm.category} onChange={e => setEditForm(p => ({...p, category: e.target.value}))}
+                    className="w-full border-2 border-black px-3 py-2 text-sm font-semibold focus:outline-none focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                    <option value="">Select category</option>
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-black uppercase tracking-wider mb-1">Merchant</label>
+                  <input value={editForm.merchant} onChange={e => setEditForm(p => ({...p, merchant: e.target.value}))}
+                    className="w-full border-2 border-black px-3 py-2 text-sm font-semibold focus:outline-none focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)]" />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-black text-black uppercase tracking-wider mb-1">Notes</label>
+                  <textarea value={editForm.notes} onChange={e => setEditForm(p => ({...p, notes: e.target.value}))} rows={2}
+                    className="w-full border-2 border-black px-3 py-2 text-sm font-semibold focus:outline-none focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)]" />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-2 border-t-2 border-dashed border-gray-200">
+                <button type="button" onClick={() => setEditingExpense(null)}
+                  className="px-5 py-2 border-2 border-black text-xs font-black uppercase tracking-wider hover:bg-gray-100 transition-colors">
+                  Cancel
+                </button>
+                <button type="submit" disabled={editLoading}
+                  className="px-5 py-2 bg-yellow-300 border-2 border-black text-xs font-black uppercase tracking-wider shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:bg-yellow-200 hover:shadow-none transition-all disabled:opacity-50">
+                  {editLoading ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>   {/* closes flex-1 flex-col div */}
+  </div>
   );
 }
 

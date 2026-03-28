@@ -232,6 +232,34 @@ class RecurringExpenseModel(RecurringBase):
     id: str
     user_id: str
 
+# Income Models
+class IncomeBase(BaseModel):
+    title: str
+    amount: float
+    date: str
+    source: str  # Salary, Freelance, Business, Investment, Gift, Other
+    description: Optional[str] = None
+    is_recurring: bool = False
+    frequency: Optional[str] = None  # monthly, weekly, etc.
+
+class IncomeCreate(IncomeBase):
+    pass
+
+class IncomeModel(IncomeBase):
+    id: str
+    user_id: str
+
+# Expense Update Model
+class ExpenseUpdate(BaseModel):
+    title: Optional[str] = None
+    amount: Optional[float] = None
+    date: Optional[str] = None
+    category: Optional[str] = None
+    description: Optional[str] = None
+    merchant: Optional[str] = None
+    notes: Optional[str] = None
+    original_currency: Optional[str] = None
+
 # Group Models
 class GroupBase(BaseModel):
     name: str
@@ -746,6 +774,134 @@ async def delete_expense(expense_id: str, current_user: User = Depends(get_curre
     except Exception as e:
         logging.error(f"Failed to delete expense: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete expense")
+
+@api_router.put("/expenses/{expense_id}")
+async def update_expense(expense_id: str, update: ExpenseUpdate, current_user: User = Depends(get_current_user)):
+    """Edit an existing expense"""
+    try:
+        expense = await db.expenses.find_one({"id": expense_id, "user_id": current_user.id})
+        if not expense:
+            raise HTTPException(status_code=404, detail="Expense not found")
+
+        # Build update dict from non-None fields
+        update_data = {k: v for k, v in update.model_dump().items() if v is not None}
+
+        # Handle currency conversion if amount/currency changed
+        if "amount" in update_data or "original_currency" in update_data:
+            currency = update_data.get("original_currency", expense.get("original_currency", "INR"))
+            amount = update_data.get("amount", expense.get("amount", 0))
+            if currency and currency != "INR":
+                inr_amt, rate = await convert_to_inr(amount, currency)
+                update_data["amount"] = round(inr_amt, 2)
+                update_data["original_amount"] = amount
+                update_data["exchange_rate"] = rate
+            else:
+                update_data["original_currency"] = "INR"
+                update_data["original_amount"] = amount
+                update_data["exchange_rate"] = 1.0
+
+        await db.expenses.update_one({"id": expense_id, "user_id": current_user.id}, {"$set": update_data})
+        updated = await db.expenses.find_one({"id": expense_id})
+        return parse_from_mongo(updated)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Failed to update expense: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update expense")
+
+# ─── Income Routes ────────────────────────────────────────────────────────────
+
+@api_router.post("/income")
+async def create_income(income: IncomeCreate, current_user: User = Depends(get_current_user)):
+    """Log a new income entry"""
+    try:
+        income_dict = income.model_dump()
+        income_dict["id"] = str(uuid.uuid4())
+        income_dict["user_id"] = current_user.id
+        await db.income.insert_one(prepare_for_mongo(income_dict.copy()))
+        return income_dict
+    except Exception as e:
+        logging.error(f"Failed to create income: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create income")
+
+@api_router.get("/income")
+async def get_income(current_user: User = Depends(get_current_user)):
+    """Get all income entries for the current user"""
+    try:
+        cursor = db.income.find({"user_id": current_user.id}).sort("date", -1)
+        entries = [parse_from_mongo(doc) async for doc in cursor]
+        return entries
+    except Exception as e:
+        logging.error(f"Failed to fetch income: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch income")
+
+@api_router.delete("/income/{income_id}")
+async def delete_income(income_id: str, current_user: User = Depends(get_current_user)):
+    """Delete an income entry"""
+    try:
+        entry = await db.income.find_one({"id": income_id, "user_id": current_user.id})
+        if not entry:
+            raise HTTPException(status_code=404, detail="Income entry not found")
+        await db.income.delete_one({"id": income_id, "user_id": current_user.id})
+        return {"message": f"Income {income_id} deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Failed to delete income: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete income")
+
+@api_router.get("/income/summary")
+async def get_income_summary(current_user: User = Depends(get_current_user)):
+    """Return total income, total expenses, net savings and savings rate"""
+    try:
+        # Total income
+        income_agg = await db.income.aggregate([
+            {"$match": {"user_id": current_user.id}},
+            {"$group": {"_id": None, "total": {"$sum": "$amount"}}}
+        ]).to_list(1)
+        total_income = income_agg[0]["total"] if income_agg else 0.0
+
+        # Total expenses (INR)
+        expense_agg = await db.expenses.aggregate([
+            {"$match": {"user_id": current_user.id}},
+            {"$group": {"_id": None, "total": {"$sum": "$amount"}}}
+        ]).to_list(1)
+        total_expenses = expense_agg[0]["total"] if expense_agg else 0.0
+
+        # Monthly income breakdown for chart
+        monthly_income = await db.income.aggregate([
+            {"$match": {"user_id": current_user.id}},
+            {"$group": {
+                "_id": {"$substr": ["$date", 0, 7]},
+                "total": {"$sum": "$amount"}
+            }},
+            {"$sort": {"_id": 1}},
+            {"$limit": 12}
+        ]).to_list(12)
+
+        # Income by source
+        by_source = await db.income.aggregate([
+            {"$match": {"user_id": current_user.id}},
+            {"$group": {"_id": "$source", "total": {"$sum": "$amount"}}},
+            {"$sort": {"total": -1}}
+        ]).to_list(20)
+
+        net_savings = total_income - total_expenses
+        savings_rate = round((net_savings / total_income * 100), 1) if total_income > 0 else 0.0
+
+        return {
+            "total_income": round(total_income, 2),
+            "total_expenses": round(total_expenses, 2),
+            "net_savings": round(net_savings, 2),
+            "savings_rate": savings_rate,
+            "monthly_income": [{"month": m["_id"], "income": round(m["total"], 2)} for m in monthly_income],
+            "by_source": [{"source": s["_id"], "total": round(s["total"], 2)} for s in by_source]
+        }
+    except Exception as e:
+        logging.error(f"Failed to calculate income summary: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to calculate income summary")
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 @api_router.get("/expenses/export")
 async def export_expenses_csv(current_user: User = Depends(get_current_user)):
