@@ -1065,7 +1065,103 @@ async def delete_budget(budget_id: str, current_user: User = Depends(get_current
         logging.error(f"Failed to delete budget: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete budget")
 
+# ─────────────────────── CUSTOM CATEGORIES ───────────────────────
+
+class CategoryCreate(BaseModel):
+    name: str
+    icon: Optional[str] = "📌"
+    color: Optional[str] = "gray"
+
+@api_router.get("/categories")
+async def get_categories(current_user: User = Depends(get_current_user)):
+    """List user's custom categories"""
+    try:
+        cursor = db.categories.find({"user_id": current_user.id})
+        return [parse_from_mongo(doc) async for doc in cursor]
+    except Exception as e:
+        logging.error(f"Failed to fetch categories: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch categories")
+
+@api_router.post("/categories")
+async def create_category(cat: CategoryCreate, current_user: User = Depends(get_current_user)):
+    """Create a new custom category"""
+    try:
+        # Prevent duplicates
+        existing = await db.categories.find_one({"user_id": current_user.id, "name": cat.name})
+        if existing:
+            raise HTTPException(status_code=400, detail="Category already exists")
+        cat_dict = cat.model_dump()
+        cat_dict["id"] = str(uuid.uuid4())
+        cat_dict["user_id"] = current_user.id
+        await db.categories.insert_one(prepare_for_mongo(cat_dict.copy()))
+        return cat_dict
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Failed to create category: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create category")
+
+@api_router.delete("/categories/{cat_id}")
+async def delete_category(cat_id: str, current_user: User = Depends(get_current_user)):
+    """Delete a custom category"""
+    try:
+        result = await db.categories.delete_one({"id": cat_id, "user_id": current_user.id})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Category not found")
+        return {"message": "Category deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to delete category")
+
+@api_router.get("/budgets/alerts")
+async def get_budget_alerts(current_user: User = Depends(get_current_user)):
+    """Return budgets that have exceeded 80% or 100% of their monthly limit"""
+    try:
+        now = datetime.now(timezone.utc)
+        month_start = now.replace(day=1).strftime("%Y-%m-%d")
+        month_end   = now.strftime("%Y-%m-%d")
+
+        # Get all budgets
+        budgets = [parse_from_mongo(doc) async for doc in db.budgets.find({"user_id": current_user.id})]
+
+        alerts = []
+        for budget in budgets:
+            cat = budget.get("category")
+            limit = budget.get("amount", 0)
+            if not cat or limit <= 0:
+                continue
+
+            # Sum expenses in this category this month
+            agg = await db.expenses.aggregate([
+                {"$match": {
+                    "user_id": current_user.id,
+                    "category": cat,
+                    "date": {"$gte": month_start, "$lte": month_end}
+                }},
+                {"$group": {"_id": None, "total": {"$sum": "$amount"}}}
+            ]).to_list(1)
+            spent = agg[0]["total"] if agg else 0.0
+            pct = round(spent / limit * 100, 1)
+
+            if pct >= 80:
+                alerts.append({
+                    "budget_id": budget.get("id"),
+                    "category": cat,
+                    "limit": round(limit, 2),
+                    "spent": round(spent, 2),
+                    "pct": pct,
+                    "level": "critical" if pct >= 100 else "warning"
+                })
+
+        alerts.sort(key=lambda x: x["pct"], reverse=True)
+        return alerts
+    except Exception as e:
+        logging.error(f"Failed to get budget alerts: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get budget alerts")
+
 # ─────────────────────── RECURRING EXPENSE ROUTES ───────────────────────
+
 
 async def _sync_recurring_expenses(user_id: str):
     """Auto-generate expenses for recurring items that are due."""

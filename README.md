@@ -12,12 +12,28 @@ RupeeFlow is a full-stack expense tracking platform that combines **AI-driven in
 
 ### 💰 Expense Management
 - **Quick Manual Entry** — Add expenses with title, amount, category, date, notes, and currency
+- **Edit Expenses** — Full modification support for existing entries via modal pre-fill
 - **AI-Powered Auto-Categorization** — Gemini AI automatically suggests the correct category on entry
 - **Anomaly Detection** — Real-time alerts when an expense is statistically unusual for its category
-- **Delete Expenses** — Remove any individual expense from your history
-- **Export to CSV** — Download your full expense history as a spreadsheet
-- **Export to PDF** — Generate a formatted PDF report of all expenses (via ReportLab)
-- **16 Predefined Categories** — Tailored for Indian spending patterns (Food & Dining, Transport, Home & Family, etc.)
+- **Manage Transactions** — Dedicated "All Expenses" table with real-time **Search, Category Filtering, Sorting, and Pagination**
+- **Delete Expenses** — Single-click removal of individual entries
+- **Export Reports** — Download full history as **Standard CSV** or **Professional PDF** (with automatic currency summing)
+
+### 📈 Income & Savings Tracking
+- **Income Logging** — Track earnings across 8 sources (Salary, Freelance, Business, etc.)
+- **Net Savings Banner** — Real-time display of **Total Income**, **Total Expenses**, **Net Savings**, and **Savings Rate %**
+- **Income History** — Detailed log with source tagging and deletion support
+
+### 📌 Custom Categories
+- **User-Defined Categories** — Add custom spending buckets with unique icons and color tags
+- **Seamless Integration** — Custom categories automatically join the default list in forms, budgets, and filters
+- **Management Center** — Dedicated categories view for adding/removing custom tags
+
+### 🎯 Budget Management
+- **Set Monthly Budgets** — Define a spending limit per category per month
+- **Smart Alerts Banner** — **Global "Sticky" Warning Banner** appears when spending hits 80% or 100% of any budget limit
+- **Live Progress Tracking** — Visual progress bar showing spent vs budget
+- **Overspend Warnings** — Color-coded alerts when approaching or exceeding budget
 
 ### 📸 Receipt Scanning (OCR)
 - **Upload Receipt Images** — PNG, JPG, JPEG supported
@@ -51,12 +67,6 @@ RupeeFlow is a full-stack expense tracking platform that combines **AI-driven in
 - **Expense Queries** — "How much did I spend on food this month?", "Show my top 5 expenses"
 - **Spending Summaries** — Instant summaries by category, time range, or custom queries
 - **Powered by Gemini** — Uses Google Gemini with automatic model fallback
-
-### 🎯 Budget Management
-- **Set Monthly Budgets** — Define a spending limit per category per month
-- **Live Progress Tracking** — Visual progress bar showing spent vs budget
-- **Overspend Warnings** — Color-coded alerts when approaching or exceeding budget
-- **Budget CRUD** — Create, view, and delete budgets
 
 ### 🔁 Recurring Expenses
 - **Automated Tracking** — Define expenses that recur daily, weekly, or monthly

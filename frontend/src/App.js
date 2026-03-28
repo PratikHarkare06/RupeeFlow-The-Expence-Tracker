@@ -605,22 +605,38 @@ function App() {
     source: 'Salary', description: '', is_recurring: false, frequency: ''
   });
 
-  // ── All Expenses filter state
   const [expenseSearch, setExpenseSearch] = useState('');
   const [expenseCategoryFilter, setExpenseCategoryFilter] = useState('');
-  const [expenseSortBy, setExpenseSortBy] = useState('date-desc'); // date-desc, date-asc, amount-desc, amount-asc
+  const [expenseSortBy, setExpenseSortBy] = useState('date-desc');
   const [expenseDateFrom, setExpenseDateFrom] = useState('');
   const [expenseDateTo, setExpenseDateTo] = useState('');
   const [expensePage, setExpensePage] = useState(1);
   const EXPENSES_PER_PAGE = 15;
 
-  // Indian expense categories
-  const categories = [
-    "Food & Dining", "Groceries & Household", "Transportation", "Shopping & Clothes", 
-    "Bills & Utilities", "Mobile & Internet", "Healthcare", "Entertainment", 
-    "Travel & Vacation", "Education & Courses", "Home & Family", "Personal Care", 
+  // ── Budget Alerts state
+  const [budgetAlerts, setBudgetAlerts] = useState([]);
+  const [dismissedAlerts, setDismissedAlerts] = useState(new Set());
+  const [alertsVisible, setAlertsVisible] = useState(true);
+
+  // ── Custom Categories state
+  const [customCategories, setCustomCategories] = useState([]);
+  const [catForm, setCatForm] = useState({ name: '', icon: '📌', color: 'gray' });
+  const [catLoading, setCatLoading] = useState(false);
+  const [showAddCat, setShowAddCat] = useState(false);
+
+
+  // Default + custom categories merged
+  const DEFAULT_CATEGORIES = [
+    "Food & Dining", "Groceries & Household", "Transportation", "Shopping & Clothes",
+    "Bills & Utilities", "Mobile & Internet", "Healthcare", "Entertainment",
+    "Travel & Vacation", "Education & Courses", "Home & Family", "Personal Care",
     "Gifts & Festivals", "EMI & Loans", "Investments & SIP", "Other"
   ];
+  const categories = [
+    ...DEFAULT_CATEGORIES,
+    ...customCategories.map(c => c.name).filter(n => !DEFAULT_CATEGORIES.includes(n))
+  ];
+
 
   // Configure axios defaults
   useEffect(() => {
@@ -669,7 +685,9 @@ function App() {
           fetchGoals(),
           fetchForecast(),
           fetchCurrencyRates(),
-          fetchGroups()
+          fetchGroups(),
+          fetchCustomCategories(),
+          fetchBudgetAlerts(),
         ]);
       } catch (error) {
         console.error('Error loading initial data:', error);
@@ -691,13 +709,15 @@ function App() {
     if (activeTab === 'user-dashboard' && isAuthenticated && !userDashboard && !loadingUserDashboard) {
       fetchUserDashboard();
     }
-    if (activeTab === 'budgets' && isAuthenticated) fetchBudgets();
+    if (activeTab === 'budgets' && isAuthenticated) { fetchBudgets(); fetchBudgetAlerts(); }
     if (activeTab === 'recurring' && isAuthenticated) fetchRecurring();
     if (activeTab === 'goals' && isAuthenticated) fetchGoals();
     if (activeTab === 'groups' && isAuthenticated) fetchGroups();
     if (activeTab === 'income' && isAuthenticated) { fetchIncome(); fetchIncomeSummary(); }
     if (activeTab === 'all-expenses' && isAuthenticated) fetchExpenses();
+    if (activeTab === 'categories' && isAuthenticated) fetchCustomCategories();
   }, [activeTab, isAuthenticated]);
+
 
   const fetchExpenses = async () => {
     try {
@@ -938,6 +958,64 @@ function App() {
       await fetchIncome();
       await fetchIncomeSummary();
     } catch (e) { alert('Failed to delete income entry'); }
+  };
+
+  // ── Budget Alerts handlers
+  const fetchBudgetAlerts = async () => {
+    try {
+      const res = await axios.get(`${API}/api/budgets/alerts`);
+      setBudgetAlerts(res.data);
+      if (res.data.length > 0) setAlertsVisible(true);
+    } catch (e) { console.error('Failed to fetch budget alerts:', e); }
+  };
+
+  // ── Custom Categories handlers
+  const fetchCustomCategories = async () => {
+    try {
+      setCatLoading(true);
+      const res = await axios.get(`${API}/api/categories`);
+      setCustomCategories(res.data);
+    } catch (e) { console.error('Failed to fetch categories:', e); }
+    finally { setCatLoading(false); }
+  };
+
+  const addCustomCategory = async (e) => {
+    e.preventDefault();
+    if (!catForm.name.trim()) return;
+    try {
+      await axios.post(`${API}/api/categories`, catForm);
+      setCatForm({ name: '', icon: '📌', color: 'gray' });
+      setShowAddCat(false);
+      await fetchCustomCategories();
+    } catch (err) {
+      const msg = err.response?.data?.detail || 'Failed to add category';
+      alert(msg);
+    }
+  };
+
+  const deleteCustomCategory = async (id) => {
+    if (!window.confirm('Delete this custom category?')) return;
+    try {
+      await axios.delete(`${API}/api/categories/${id}`);
+      await fetchCustomCategories();
+    } catch (e) { alert('Failed to delete category'); }
+  };
+
+  const downloadReport = async (type) => {
+    try {
+      const response = await axios.get(`${API}/api/expenses/${type}`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `rupeeflow_expenses_${new Date().toISOString().split('T')[0]}.${type === 'export' ? 'csv' : 'pdf'}`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (e) {
+      alert('Failed to download report. Make sure you are authenticated.');
+    }
   };
 
   // ── All Expenses filtered list (computed)
@@ -1706,6 +1784,11 @@ function App() {
                 id: 'all-expenses',
                 name: 'All Expenses',
                 icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
+              },
+              {
+                id: 'categories',
+                name: 'Categories',
+                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
               }
           ].map(tab => (
             <button
@@ -1718,9 +1801,14 @@ function App() {
               }`}
             >
               <div className={activeTab === tab.id ? 'text-yellow-300' : 'text-gray-400'}>{tab.icon}</div>
-              <span>{tab.name}</span>
+              <span className="flex-1">{tab.name}</span>
+              {/* Budget alert dot on budgets tab */}
+              {tab.id === 'budgets' && budgetAlerts.filter(a => !dismissedAlerts.has(a.budget_id)).length > 0 && (
+                <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0 animate-pulse" />
+              )}
             </button>
           ))}
+
         </div>
 
         {/* Sign Out */}
@@ -1752,11 +1840,14 @@ function App() {
               { id: 'user-dashboard', name: 'Profile' },
               { id: 'dashboard', name: 'Dashboard' },
               { id: 'add-expense', name: 'Add Expense' },
+              { id: 'income', name: 'Income' },
+              { id: 'all-expenses', name: 'All Expenses' },
               { id: 'receipt-scan', name: 'Scan Receipt' },
               { id: 'groups', name: 'Wallets' },
               { id: 'assistant', name: 'Assistant' },
               { id: 'analytics', name: 'Analytics' },
               { id: 'budgets', name: 'Budgets' },
+              { id: 'categories', name: 'Categories' },
               { id: 'recurring', name: 'Recurring' },
               { id: 'goals', name: 'Goals' },
               { id: 'predictions', name: 'Predictions' }
@@ -1775,6 +1866,45 @@ function App() {
         </header>
 
         <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-8 w-full max-w-7xl mx-auto pb-40">
+
+          {/* ═══ GLOBAL BUDGET ALERTS BANNER ═══ */}
+          {alertsVisible && budgetAlerts.filter(a => !dismissedAlerts.has(a.budget_id)).length > 0 && (
+            <div className="mb-6 space-y-2">
+              {budgetAlerts.filter(a => !dismissedAlerts.has(a.budget_id)).map(alert => (
+                <div key={alert.budget_id}
+                  className={`flex items-center justify-between px-5 py-3 border-2 border-black shadow-[3px_3px_0_0_rgba(0,0,0,1)] ${
+                    alert.level === 'critical' ? 'bg-red-400' : 'bg-yellow-300'
+                  }`}>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl">{alert.level === 'critical' ? '🚨' : '⚠️'}</span>
+                    <div>
+                      <span className="font-black text-black text-xs uppercase tracking-widest">
+                        {alert.level === 'critical' ? 'BUDGET EXCEEDED' : 'BUDGET WARNING'}
+                      </span>
+                      <span className="text-black font-semibold text-xs ml-2">
+                        {alert.category} — ₹{alert.spent.toLocaleString('en-IN')} of ₹{alert.limit.toLocaleString('en-IN')} ({alert.pct}%)
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setActiveTab('budgets')}
+                      className="px-3 py-1 bg-black text-white text-[10px] font-black uppercase tracking-wider hover:bg-gray-800 transition-colors">
+                      View Budgets
+                    </button>
+                    <button onClick={() => setDismissedAlerts(prev => new Set([...prev, alert.budget_id]))}
+                      className="text-black/60 hover:text-black w-6 h-6 flex items-center justify-center font-black text-sm transition-colors">
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <button onClick={() => setAlertsVisible(false)}
+                className="text-xs font-black uppercase tracking-wider text-gray-400 hover:text-black underline transition-colors">
+                Hide all alerts
+              </button>
+            </div>
+          )}
+
           {activeTab === 'dashboard' && (
             <div className="space-y-6 animate-[slideDown_0.3s_ease-out]">
               <div className="bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -3922,9 +4052,21 @@ function App() {
       {activeTab === 'all-expenses' && (
         <div className="p-6 md:p-10 max-w-6xl mx-auto space-y-6">
           {/* Page header */}
-          <div>
-            <h2 className="text-2xl font-black text-black uppercase tracking-tight">All Expenses</h2>
-            <p className="text-sm font-medium text-gray-500 mt-1">{expenses.length} total expenses · {filteredExpenses.length} matching filters</p>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-black text-black uppercase tracking-tight">All Expenses</h2>
+              <p className="text-sm font-medium text-gray-500 mt-1">{expenses.length} total expenses · {filteredExpenses.length} matching filters</p>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => downloadReport('pdf')}
+                className="flex items-center gap-2 px-4 py-2 bg-white text-black border-2 border-black font-black text-[10px] uppercase tracking-widest hover:bg-black hover:text-white transition-all shadow-[3px_3px_0_0_rgba(0,0,0,1)] hover:shadow-none">
+                📥 PDF
+              </button>
+              <button onClick={() => downloadReport('export')}
+                className="flex items-center gap-2 px-4 py-2 bg-white text-black border-2 border-black font-black text-[10px] uppercase tracking-widest hover:bg-black hover:text-white transition-all shadow-[3px_3px_0_0_rgba(0,0,0,1)] hover:shadow-none">
+                📊 CSV
+              </button>
+            </div>
           </div>
 
           {/* Filter Bar */}
@@ -4027,6 +4169,119 @@ function App() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ═══════════════════════ CATEGORIES TAB ═══════════════════════ */}
+      {activeTab === 'categories' && (
+        <div className="p-6 md:p-10 max-w-4xl mx-auto space-y-8">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-black text-black uppercase tracking-tight">Categories</h2>
+              <p className="text-sm font-medium text-gray-500 mt-1">Manage your default and custom expense categories</p>
+            </div>
+            <button onClick={() => setShowAddCat(true)}
+              className="flex items-center gap-2 px-5 py-2.5 bg-black text-yellow-300 border-2 border-black font-black text-xs uppercase tracking-widest hover:bg-yellow-300 hover:text-black transition-colors shadow-[3px_3px_0_0_rgba(0,0,0,0.2)]">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4"/></svg>
+              New Category
+            </button>
+          </div>
+
+          {/* Add Category Form */}
+          {showAddCat && (
+            <div className="bg-white border-2 border-black shadow-[6px_6px_0_0_rgba(0,0,0,1)]">
+              <div className="px-6 py-4 bg-black border-b-2 border-black flex justify-between items-center">
+                <h3 className="text-white font-black text-sm uppercase tracking-widest">Create Custom Category</h3>
+                <button onClick={() => setShowAddCat(false)} className="text-white hover:text-yellow-300">✕</button>
+              </div>
+              <form onSubmit={addCustomCategory} className="p-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="sm:col-span-1">
+                  <label className="block text-xs font-black uppercase tracking-wider mb-1">Category Name *</label>
+                  <input required value={catForm.name} onChange={e => setCatForm(p => ({...p, name: e.target.value}))}
+                    placeholder="e.g. Crypto, Side Hustle"
+                    className="w-full border-2 border-black px-3 py-2 text-sm font-semibold focus:outline-none focus:shadow-[2px_2px_0_0_rgba(0,0,0,1)]" />
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider mb-1">Icon (emoji)</label>
+                  <input value={catForm.icon} onChange={e => setCatForm(p => ({...p, icon: e.target.value}))}
+                    maxLength={2} placeholder="📌"
+                    className="w-full border-2 border-black px-3 py-2 text-xl text-center font-semibold focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider mb-1">Color Tag</label>
+                  <select value={catForm.color} onChange={e => setCatForm(p => ({...p, color: e.target.value}))}
+                    className="w-full border-2 border-black px-3 py-2 text-sm font-semibold focus:outline-none">
+                    {['gray','red','orange','yellow','green','blue','purple','pink'].map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase()+c.slice(1)}</option>)}
+                  </select>
+                </div>
+                <div className="sm:col-span-3 flex justify-end gap-3 pt-2 border-t-2 border-dashed border-gray-200">
+                  <button type="button" onClick={() => setShowAddCat(false)}
+                    className="px-5 py-2 border-2 border-black text-xs font-black uppercase">Cancel</button>
+                  <button type="submit"
+                    className="px-5 py-2 bg-yellow-300 border-2 border-black text-xs font-black uppercase shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:shadow-none transition-all">
+                    Create Category
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* Custom Categories */}
+          {customCategories.length > 0 && (
+            <div className="bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+              <div className="px-6 py-4 border-b-2 border-black flex items-center justify-between">
+                <h3 className="font-black text-sm uppercase tracking-widest">Your Custom Categories</h3>
+                <span className="text-xs font-bold text-gray-500">{customCategories.length} custom</span>
+              </div>
+              <div className="divide-y-2 divide-gray-100">
+                {customCategories.map(cat => (
+                  <div key={cat.id} className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-10 h-10 bg-${cat.color}-200 border-2 border-black flex items-center justify-center text-xl flex-shrink-0`}>
+                        {cat.icon}
+                      </div>
+                      <div>
+                        <p className="font-black text-black text-sm">{cat.name}</p>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{cat.color} · Custom</p>
+                      </div>
+                    </div>
+                    <button onClick={() => deleteCustomCategory(cat.id)}
+                      className="text-gray-400 hover:text-red-600 hover:bg-red-50 w-8 h-8 flex items-center justify-center border border-transparent hover:border-red-200 transition-all">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Default Categories Grid */}
+          <div className="bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+            <div className="px-6 py-4 border-b-2 border-black">
+              <h3 className="font-black text-sm uppercase tracking-widest">Default Categories</h3>
+              <p className="text-xs text-gray-400 mt-1 font-medium">These are available everywhere and cannot be removed</p>
+            </div>
+            <div className="p-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {DEFAULT_CATEGORIES.map(cat => (
+                <div key={cat} className="flex items-center gap-2 px-3 py-2 border-2 border-gray-200 bg-gray-50 hover:border-black hover:bg-white transition-all">
+                  <span className="text-sm">📂</span>
+                  <span className="text-xs font-bold text-gray-700 leading-tight">{cat}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Tip banner */}
+          <div className="flex items-start gap-3 px-5 py-4 bg-yellow-50 border-2 border-yellow-300 shadow-[2px_2px_0_0_rgba(0,0,0,0.15)]">
+            <span className="text-xl">💡</span>
+            <div>
+              <p className="font-black text-black text-xs uppercase tracking-wider">Pro Tip</p>
+              <p className="text-xs text-gray-600 mt-1 font-medium">
+                Custom categories you create here automatically appear in all expense forms, budget settings, and filters across the app.
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
