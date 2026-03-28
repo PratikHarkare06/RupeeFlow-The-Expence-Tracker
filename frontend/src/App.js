@@ -1723,72 +1723,72 @@ function App() {
               { 
                 id: 'user-dashboard', 
                 name: 'Profile', 
-                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                icon: <svg className="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM5 21a7 7 0 0114 0" /></svg>
               },
               { 
                 id: 'dashboard', 
                 name: 'Dashboard', 
-                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                icon: <svg className="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M4 4h7v7H4V4zm9 0h7v7h-7V4zm0 9h7v7h-7v-7zm-9 0h7v7H4v-7z" /></svg>
               },
               { 
                 id: 'add-expense', 
                 name: 'Add Expense', 
-                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                icon: <svg className="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M12 4v16m8-8H4" /><rect x="2" y="2" width="20" height="20" strokeWidth={2.5} /></svg>
               },
               { 
                 id: 'receipt-scan', 
                 name: 'Scan Receipt', 
-                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                icon: <svg className="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M3 7V5a2 2 0 012-2h2m10 0h2a2 2 0 012 2v2m0 10v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2m0-4h18M7 8h10M7 12h10" /></svg>
               },
               { 
                 id: 'groups', 
                 name: 'Shared Wallets', 
-                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                icon: <svg className="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" /></svg>
               },
               { 
                 id: 'assistant', 
                 name: 'Assistant', 
-                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                icon: <svg className="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.364-6.364l-.707-.707M6.73 17a5 5 0 1110.54 0H6.73z" /></svg>
               },
               { 
                 id: 'analytics', 
                 name: 'Analytics', 
-                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                icon: <svg className="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" /></svg>
               },
               { 
                 id: 'budgets', 
                 name: 'Budgets', 
-                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" /></svg>
+                icon: <svg className="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2zm0-4H4a2 2 0 00-2 2v2M12 11v4m0 0l-2-2m2 2l2-2" /></svg>
               },
               { 
                 id: 'recurring', 
                 name: 'Recurring', 
-                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                icon: <svg className="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
               },
               { 
                 id: 'goals', 
                 name: 'Goals', 
-                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>
+                icon: <svg className="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4" /></svg>
               },
               { 
                 id: 'predictions', 
                 name: 'Predictions', 
-                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                icon: <svg className="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
               },
               {
                 id: 'income',
                 name: 'Income',
-                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /><circle cx="12" cy="12" r="10" strokeWidth={2}/></svg>
+                icon: <svg className="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" /><circle cx="12" cy="12" r="10" strokeWidth={2.5} /></svg>
               },
               {
                 id: 'all-expenses',
                 name: 'All Expenses',
-                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
+                icon: <svg className="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9h4m-4 4h4" /></svg>
               },
               {
                 id: 'categories',
                 name: 'Categories',
-                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
+                icon: <svg className="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
               }
           ].map(tab => (
             <button
@@ -1910,9 +1910,9 @@ function App() {
               <div className="bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center space-x-4">
                 <div className="w-14 h-14 bg-black border-2 border-black flex items-center justify-center shadow-[3px_3px_0_0_rgba(99,102,241,1)]">
-                  <svg className="w-8 h-8 text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                  </svg>
+                   <svg className="w-8 h-8 text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                   </svg>
                 </div>
                 <div>
                   <h2 className="text-xl font-black text-black uppercase tracking-tight">Financial Insights</h2>
@@ -1947,8 +1947,8 @@ function App() {
                     <p className="text-xs font-bold text-gray-400 mt-1 uppercase tracking-tight">All time transactions</p>
                   </div>
                   <div className="w-12 h-12 bg-yellow-300 border-2 border-black flex items-center justify-center shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
-                    <svg className="w-5 h-5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 8l2 2 4-4" />
+                    <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                     </svg>
                   </div>
                 </div>
@@ -1966,8 +1966,8 @@ function App() {
                     </p>
                   </div>
                   <div className="w-12 h-12 bg-indigo-500 border-2 border-indigo-300 flex items-center justify-center">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                     </svg>
                   </div>
                 </div>
@@ -1983,8 +1983,8 @@ function App() {
                     <p className="text-xs font-bold text-gray-400 mt-1 uppercase tracking-tight">Expense categories used</p>
                   </div>
                   <div className="w-12 h-12 bg-green-400 border-2 border-black flex items-center justify-center shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
-                    <svg className="w-5 h-5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                     </svg>
                   </div>
                 </div>
@@ -2629,9 +2629,11 @@ function App() {
           <div className="max-w-3xl mx-auto py-12 px-4">
             <div className="bg-white border-2 border-black shadow-[8px_8px_0_0_rgba(0,0,0,1)] rounded-none">
               <div className="px-8 py-6 border-b-2 border-black flex gap-3 items-center">
-                <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-                </svg>
+                <div className="w-12 h-12 bg-blue-100 border-2 border-black shadow-[3px_3px_0_0_rgba(0,0,0,1)] flex items-center justify-center flex-shrink-0">
+                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="2.5" d="M3 7V5a2 2 0 012-2h2m10 0h2a2 2 0 012 2v2m0 10v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2m0-4h18M7 8h10M7 12h10" />
+                  </svg>
+                </div>
                 <div>
                   <h3 className="text-2xl font-black text-black tracking-tight">Scan Bill/Receipt</h3>
                   <p className="text-sm font-medium text-gray-600 mt-1">Upload your Indian bill/receipt and let AI extract expense details automatically</p>
@@ -2646,8 +2648,8 @@ function App() {
                   <div className={"mt-1 flex justify-center px-6 pt-10 pb-12 border-2 border-black " + (receiptFile ? "border-solid bg-[#f0f9ff]" : "border-dashed bg-[#fafafa]") + " hover:border-blue-500 transition-colors cursor-pointer group"} onClick={() => document.getElementById('receipt-upload')?.click()}>
                     <div className="space-y-2 text-center">
                       <svg className="mx-auto h-12 w-12 text-black group-hover:text-blue-500 transition-colors" stroke="currentColor" fill="none" viewBox="0 0 24 24">
-                        <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="2" d="M12 4v10m0-10l-4 4m4-4l4 4m-8 6h8" />
-                        <rect x="3" y="3" width="18" height="18" rx="0" stroke="currentColor" strokeWidth="2" />
+                        <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="2.5" d="M12 4v10m0-10l-4 4m4-4l4 4m-8 6h8" />
+                        <rect x="3" y="3" width="18" height="18" strokeWidth="2.5" />
                       </svg>
                       <div className="text-sm text-black font-semibold mt-4">
                         <span className="text-[#FFD700] underline underline-offset-4 font-bold decoration-black group-hover:text-blue-600">Upload your bill/receipt</span>
@@ -2735,8 +2737,8 @@ function App() {
           <div className="bg-[#f0f9ff] border-2 border-black shadow-[8px_8px_0_0_rgba(0,0,0,1)] flex flex-col h-[600px] rounded-none animate-fadeIn max-w-5xl mx-auto">
             <div className="px-6 py-5 border-b-2 border-black flex items-center justify-between bg-white">
               <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-[#FFD700] border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] flex items-center justify-center text-black">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="2.5" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+                <div className="w-12 h-12 bg-[#FFD700] border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] flex items-center justify-center text-black transition-transform hover:-rotate-6 hover:scale-110">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="2.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.364-6.364l-.707-.707M6.73 17a5 5 0 1110.54 0H6.73z" /></svg>
                 </div>
                 <div>
                   <h3 className="text-2xl font-black text-black tracking-tight uppercase">RupeeFlow AI Assistant</h3>
@@ -3000,7 +3002,9 @@ function App() {
               {/* Category Donut */}
               <div className="bg-white rounded-none border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
                 <div className="px-6 py-4 border-b-2 border-black flex items-center gap-3 bg-[#f0f9ff]">
-                  <span className="w-10 h-10 bg-white border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] flex items-center justify-center text-lg">📊</span>
+                  <span className="w-10 h-10 bg-white border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] flex items-center justify-center">
+                    <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" /><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" /></svg>
+                  </span>
                   <h3 className="text-xl font-black text-black tracking-tight">Category Breakdown</h3>
                 </div>
                 <div className="p-6">
@@ -3095,7 +3099,10 @@ function App() {
                     <p className="uppercase tracking-widest text-[#FFD700] text-sm font-black mb-2 border-b-2 border-[#FFD700] inline-block pb-1">Next Month Prediction</p>
                     <h3 className="text-6xl font-black mb-6 mt-4 tracking-tighter">{formatCurrency(forecast.predicted_total)}</h3>
                     <div className="bg-black/20 border-2 border-black p-4">
-                      <p className="text-sm font-black text-[#FFD700] uppercase tracking-wider mb-2">💡 Trend Insight</p>
+                      <p className="text-sm font-black text-[#FFD700] uppercase tracking-wider mb-2 flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                        Trend Insight
+                      </p>
                       <p className="text-sm text-white font-bold leading-snug">Our AI predicts this based on your most recent spending behaviors and seasonal trends.</p>
                     </div>
                   </div>
@@ -3103,7 +3110,9 @@ function App() {
                   <div className="space-y-6">
                     <div className="bg-[#FFD700] border-2 border-black rounded-none p-6 shadow-[4px_4px_0_0_rgba(0,0,0,1)] transition-transform hover:-translate-y-1">
                       <h4 className="font-black text-black text-lg uppercase tracking-wider mb-4 flex items-center gap-3">
-                        <span className="w-8 h-8 bg-white border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] flex items-center justify-center text-sm">⭐</span>
+                        <span className="w-10 h-10 bg-white border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] flex items-center justify-center">
+                          <svg className="w-5 h-5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.54 1.118l-3.976-2.888a1 1 0 00-1.175 0l-3.976 2.888c-.784.57-1.838-.197-1.539-1.118l1.518-4.674a1 1 0 00-.364-1.118L2.98 10.101c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>
+                        </span>
                         Saving Opportunity
                       </h4>
                       <p className="text-black text-base font-bold italic leading-relaxed">"{forecast.savings_tip}"</p>
@@ -3413,7 +3422,7 @@ function App() {
                 className="text-gray-400 hover:text-gray-600"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
@@ -3939,13 +3948,13 @@ function App() {
           {incomeSummary && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { label: 'Total Income', value: `₹${(incomeSummary.total_income || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}`, bg: 'bg-green-400', icon: '📈' },
-                { label: 'Total Expenses', value: `₹${(incomeSummary.total_expenses || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}`, bg: 'bg-red-400', icon: '📉' },
-                { label: 'Net Savings', value: `₹${Math.abs(incomeSummary.net_savings || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}${(incomeSummary.net_savings || 0) < 0 ? ' DEFICIT' : ''}`, bg: (incomeSummary.net_savings || 0) >= 0 ? 'bg-yellow-300' : 'bg-orange-400', icon: '💰' },
-                { label: 'Savings Rate', value: `${incomeSummary.savings_rate || 0}%`, bg: 'bg-blue-300', icon: '🎯' },
+                { label: 'Total Income', value: `₹${(incomeSummary.total_income || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}`, bg: 'bg-green-400', icon: <svg className="w-8 h-8 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg> },
+                { label: 'Total Expenses', value: `₹${(incomeSummary.total_expenses || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}`, bg: 'bg-red-400', icon: <svg className="w-8 h-8 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M13 17H5m0 0v-8m0 8l8-8 4 4 6-6" /></svg> },
+                { label: 'Net Savings', value: `₹${Math.abs(incomeSummary.net_savings || 0).toLocaleString('en-IN', {maximumFractionDigits:0})}${(incomeSummary.net_savings || 0) < 0 ? ' DEFICIT' : ''}`, bg: (incomeSummary.net_savings || 0) >= 0 ? 'bg-yellow-300' : 'bg-orange-400', icon: <svg className="w-8 h-8 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" /></svg> },
+                { label: 'Savings Rate', value: `${incomeSummary.savings_rate || 0}%`, bg: 'bg-blue-300', icon: <svg className="w-8 h-8 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806" /></svg> },
               ].map(card => (
                 <div key={card.label} className={`${card.bg} border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] p-4`}>
-                  <div className="text-2xl mb-1">{card.icon}</div>
+                  <div className="mb-2">{card.icon}</div>
                   <div className="text-xs font-black uppercase tracking-widest text-black/70">{card.label}</div>
                   <div className="text-xl font-black text-black mt-1">{card.value}</div>
                 </div>
@@ -4013,7 +4022,9 @@ function App() {
               <div className="p-8 text-center text-sm font-bold text-gray-400">Loading...</div>
             ) : incomeList.length === 0 ? (
               <div className="p-12 text-center">
-                <div className="text-4xl mb-3">💸</div>
+                <div className="w-20 h-20 bg-green-100 border-2 border-dashed border-black mx-auto mb-4 flex items-center justify-center">
+                  <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" /></svg>
+                </div>
                 <p className="font-black text-black uppercase tracking-widest text-sm">No income recorded yet</p>
                 <p className="text-xs text-gray-500 mt-1 font-medium">Click "Add Income" to log your first entry</p>
               </div>
@@ -4022,7 +4033,9 @@ function App() {
                 {incomeList.map(entry => (
                   <div key={entry.id} className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors">
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-green-300 border-2 border-black flex items-center justify-center flex-shrink-0 font-black text-lg">₹</div>
+                      <div className="w-12 h-12 bg-green-100 border-2 border-black flex items-center justify-center flex-shrink-0 shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                        <svg className="w-6 h-6 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" /></svg>
+                      </div>
                       <div>
                         <p className="font-black text-black text-sm">{entry.title}</p>
                         <div className="flex items-center gap-2 mt-0.5">
@@ -4037,7 +4050,7 @@ function App() {
                       <span className="font-black text-green-700 text-sm">+₹{(entry.amount || 0).toLocaleString('en-IN')}</span>
                       <button onClick={() => deleteIncome(entry.id)}
                         className="text-gray-400 hover:text-red-600 hover:bg-red-50 w-7 h-7 flex items-center justify-center border border-transparent hover:border-red-200 transition-all">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
                     </div>
                   </div>
@@ -4060,11 +4073,11 @@ function App() {
             <div className="flex gap-3">
               <button onClick={() => downloadReport('pdf')}
                 className="flex items-center gap-2 px-4 py-2 bg-white text-black border-2 border-black font-black text-[10px] uppercase tracking-widest hover:bg-black hover:text-white transition-all shadow-[3px_3px_0_0_rgba(0,0,0,1)] hover:shadow-none">
-                📥 PDF
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M12 10V3L4 14h7v7l9-11h-7z" /></svg> PDF
               </button>
               <button onClick={() => downloadReport('export')}
                 className="flex items-center gap-2 px-4 py-2 bg-white text-black border-2 border-black font-black text-[10px] uppercase tracking-widest hover:bg-black hover:text-white transition-all shadow-[3px_3px_0_0_rgba(0,0,0,1)] hover:shadow-none">
-                📊 CSV
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg> CSV
               </button>
             </div>
           </div>
@@ -4183,7 +4196,7 @@ function App() {
             </div>
             <button onClick={() => setShowAddCat(true)}
               className="flex items-center gap-2 px-5 py-2.5 bg-black text-yellow-300 border-2 border-black font-black text-xs uppercase tracking-widest hover:bg-yellow-300 hover:text-black transition-colors shadow-[3px_3px_0_0_rgba(0,0,0,0.2)]">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4"/></svg>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M12 4v16m8-8H4"/></svg>
               New Category
             </button>
           </div>
