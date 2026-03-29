@@ -626,6 +626,27 @@ function App() {
 
 
   // Default + custom categories merged
+  const getCategorySvgPath = (category) => {
+    switch (category) {
+      case 'Food & Dining': return "M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z";
+      case 'Groceries & Household': return "M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.35 2.65a1 1 0 00.7 1.71h11.65M7 13v6a2 2 0 002 2h6a2 2 0 002-2v-6m-8 0V9a2 2 0 012-2h4a2 2 0 012 2v4.01";
+      case 'Transportation': return "M19 14l-7 7m0 0l-7-7m7 7V3";
+      case 'Shopping & Clothes': return "M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z";
+      case 'Bills & Utilities': return "M13 10V3L4 14h7v7l9-11h-7z";
+      case 'Mobile & Internet': return "M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z";
+      case 'Healthcare': return "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z";
+      case 'Entertainment': return "M14.828 14.828a4 4 0 01-5.656 0M9 10h1.01M15 10h1.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z";
+      case 'Travel & Vacation': return "M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z";
+      case 'Education & Courses': return "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253";
+      case 'Home & Family': return "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m0 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6";
+      case 'Personal Care': return "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z";
+      case 'Gifts & Festivals': return "M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7";
+      case 'EMI & Loans': return "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z";
+      case 'Investments & SIP': return "M13 7h8m0 0v8m0-8l-8 8-4-4-6 6";
+      default: return "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4";
+    }
+  };
+
   const DEFAULT_CATEGORIES = [
     "Food & Dining", "Groceries & Household", "Transportation", "Shopping & Clothes",
     "Bills & Utilities", "Mobile & Internet", "Healthcare", "Entertainment",
@@ -2081,12 +2102,16 @@ function App() {
                   <div className="space-y-2">
                     {Object.entries(getCategoryTotals()).sort(([,a], [,b]) => b - a).slice(0, 5).map(([category, total], index) => (
                       <div key={index} className="flex items-center justify-between p-2 hover:bg-yellow-50 border border-transparent hover:border-black transition-all">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-3 h-3 border border-black" style={{ backgroundColor: [
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 border-2 border-black flex items-center justify-center flex-shrink-0 shadow-[1px_1px_0_0_rgba(0,0,0,1)]" style={{ backgroundColor: [
                             '#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', 
                             '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#6366f1'
-                          ][index % 10] }}></div>
-                          <span className="text-xs font-bold text-gray-700">{category}</span>
+                          ][index % 10] }}>
+                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d={getCategorySvgPath(category)} />
+                            </svg>
+                          </div>
+                          <span className="text-sm font-bold text-gray-700">{category}</span>
                         </div>
                         <span className="text-xs font-black text-black">{formatCurrency(total)}</span>
                       </div>
@@ -2115,24 +2140,9 @@ function App() {
                     title="Click to view full details"
                   >
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gray-100 border-2 border-black flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gray-100 border-2 border-black flex items-center justify-center shadow-[1px_1px_0_0_rgba(0,0,0,1)]">
                         <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          {expense.category === 'Food & Dining' ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /> :
-                           expense.category === 'Groceries & Household' ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.35 2.65a1 1 0 00.7 1.71h11.65M7 13v6a2 2 0 002 2h6a2 2 0 002-2v-6m-8 0V9a2 2 0 012-2h4a2 2 0 012 2v4.01" /> :
-                           expense.category === 'Transportation' ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" /> :
-                           expense.category === 'Shopping & Clothes' ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /> :
-                           expense.category === 'Bills & Utilities' ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /> :
-                           expense.category === 'Mobile & Internet' ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /> :
-                           expense.category === 'Healthcare' ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /> :
-                           expense.category === 'Entertainment' ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1.01M15 10h1.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /> :
-                           expense.category === 'Travel & Vacation' ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /> :
-                           expense.category === 'Education & Courses' ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /> :
-                           expense.category === 'Home & Family' ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m0 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /> :
-                           expense.category === 'Personal Care' ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /> :
-                           expense.category === 'Gifts & Festivals' ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" /> :
-                           expense.category === 'EMI & Loans' ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /> :
-                           expense.category === 'Investments & SIP' ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /> :
-                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />}
+                          <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d={getCategorySvgPath(expense.category)} />
                         </svg>
                       </div>
                       <div>
@@ -2288,8 +2298,8 @@ function App() {
                 {/* Category Breakdown */}
                 <div className="bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
                   <div className="px-6 py-4 border-b-2 border-black flex items-center gap-3">
-                    <div className="w-8 h-8 bg-indigo-500 border-2 border-black flex items-center justify-center">
-                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" /></svg>
+                    <div className="w-8 h-8 bg-indigo-500 border-2 border-black flex items-center justify-center shadow-[1px_1px_0_0_rgba(0,0,0,1)]">
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" /><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" /></svg>
                     </div>
                     <h3 className="text-sm font-black text-black uppercase tracking-widest">Category Breakdown</h3>
                   </div>
@@ -2298,23 +2308,11 @@ function App() {
                       {(userDashboard?.category_breakdown || []).map((category, index) => (
                         <div key={index} className="flex items-center justify-between p-2 hover:bg-yellow-50 border border-transparent hover:border-black transition-all">
                           <div className="flex items-center space-x-3">
-                            <span className="text-lg">
-                              {category.category === 'Food & Dining' ? '🍽️' :
-                               category.category === 'Groceries & Household' ? '🛒' :
-                               category.category === 'Transportation' ? '🚗' :
-                               category.category === 'Shopping & Clothes' ? '👕' :
-                               category.category === 'Bills & Utilities' ? '⚡' :
-                               category.category === 'Mobile & Internet' ? '📱' :
-                               category.category === 'Healthcare' ? '🏥' :
-                               category.category === 'Entertainment' ? '🎬' :
-                               category.category === 'Travel & Vacation' ? '✈️' :
-                               category.category === 'Education & Courses' ? '📚' :
-                               category.category === 'Home & Family' ? '🏠' :
-                               category.category === 'Personal Care' ? '💅' :
-                               category.category === 'Gifts & Festivals' ? '🎁' :
-                               category.category === 'EMI & Loans' ? '💳' :
-                               category.category === 'Investments & SIP' ? '📈' : '💼'}
-                            </span>
+                            <div className="w-8 h-8 bg-gray-100 border-2 border-black flex items-center justify-center flex-shrink-0 shadow-[1px_1px_0_0_rgba(0,0,0,1)]">
+                              <svg className="w-4 h-4 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d={getCategorySvgPath(category.category)} />
+                              </svg>
+                            </div>
                             <div className="flex-1">
                               <p className="text-sm font-black text-black">{category.category}</p>
                               <div className="w-48 bg-gray-200 h-2 mt-1 border border-gray-300">
@@ -2358,24 +2356,10 @@ function App() {
                         title="Click to view full details"
                       >
                         <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-gray-100 border-2 border-black flex items-center justify-center">
-                            <span className="text-lg">
-                              {expense.category === 'Food & Dining' ? '🍽️' :
-                               expense.category === 'Groceries & Household' ? '🛒' :
-                               expense.category === 'Transportation' ? '🚗' :
-                               expense.category === 'Shopping & Clothes' ? '👕' :
-                               expense.category === 'Bills & Utilities' ? '⚡' :
-                               expense.category === 'Mobile & Internet' ? '📱' :
-                               expense.category === 'Healthcare' ? '🏥' :
-                               expense.category === 'Entertainment' ? '🎬' :
-                               expense.category === 'Travel & Vacation' ? '✈️' :
-                               expense.category === 'Education & Courses' ? '📚' :
-                               expense.category === 'Home & Family' ? '🏠' :
-                               expense.category === 'Personal Care' ? '💅' :
-                               expense.category === 'Gifts & Festivals' ? '🎁' :
-                               expense.category === 'EMI & Loans' ? '💳' :
-                               expense.category === 'Investments & SIP' ? '📈' : '💼'}
-                            </span>
+                          <div className="w-10 h-10 bg-gray-100 border-2 border-black flex items-center justify-center shadow-[1px_1px_0_0_rgba(0,0,0,1)] flex-shrink-0">
+                            <svg className="w-5 h-5 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d={getCategorySvgPath(expense.category)} />
+                            </svg>
                           </div>
                           <div>
                             <p className="text-sm font-black text-black">{expense.description}</p>
@@ -3029,8 +3013,12 @@ function App() {
                       <div className="space-y-3">
                         {categoryData.slice(0, 6).map((cat, i) => (
                           <div key={cat.name} className="flex items-center gap-3 p-2 border-2 border-transparent hover:border-black hover:bg-gray-50 transition-colors">
-                            <div className="w-4 h-4 border-2 border-black flex-shrink-0 shadow-[1px_1px_0_0_rgba(0,0,0,1)]" style={{ background: PALETTE[i % PALETTE.length] }} />
-                            <p className="text-sm font-bold text-black truncate flex-1">{cat.name}</p>
+                            <div className="w-8 h-8 border-2 border-black flex-shrink-0 shadow-[2px_2px_0_0_rgba(0,0,0,1)] flex items-center justify-center" style={{ background: PALETTE[i % PALETTE.length] }}>
+                              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d={getCategorySvgPath(cat.name)} />
+                              </svg>
+                            </div>
+                            <p className="text-sm font-bold text-black truncate flex-1 ml-1">{cat.name}</p>
                             <p className="text-sm font-black text-black flex-shrink-0">{formatCurrency(cat.value)}</p>
                           </div>
                         ))}
@@ -3339,8 +3327,10 @@ function App() {
                             {groupExpenses.map((exp, i) => (
                               <div key={exp.id || i} className="px-6 py-5 hover:bg-yellow-50 transition-colors flex items-center justify-between">
                                 <div className="flex items-center gap-4">
-                                  <div className="w-12 h-12 bg-white border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] text-black rounded-none flex items-center justify-center text-xl">
-                                    {exp.category === 'Food & Dining' ? '🍽️' : exp.category === 'Groceries & Household' ? '🛒' : exp.category === 'Bills & Utilities' ? '⚡' : exp.category === 'Entertainment' ? '🎬' : exp.category === 'Travel & Vacation' ? '✈️' : '🏦'}
+                                  <div className="w-12 h-12 bg-white border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] text-black rounded-none flex items-center justify-center flex-shrink-0">
+                                    <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d={getCategorySvgPath(exp.category)} />
+                                    </svg>
                                   </div>
                                   <div>
                                     <p className="text-base font-black text-black uppercase">{exp.description}</p>
@@ -3747,8 +3737,10 @@ function App() {
                     {recurringItems.map(r => (
                       <div key={r.id} className={`flex flex-col sm:flex-row sm:items-center justify-between p-5 border-2 border-black transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0_0_rgba(0,0,0,1)] ${r.is_active ? 'bg-white shadow-[2px_2px_0_0_rgba(0,0,0,1)]' : 'bg-gray-100 opacity-80'}`}>
                         <div className="flex items-center gap-5 mb-4 sm:mb-0">
-                          <div className={`w-14 h-14 border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] flex items-center justify-center text-2xl ${r.is_active ? 'bg-[#FFD700] text-black' : 'bg-gray-300 text-gray-500'}`}>
-                            {r.category === 'Entertainment' ? '🎬' : r.category === 'Bills & Utilities' ? '⚡' : r.category === 'Food & Dining' ? '🍔' : '💳'}
+                          <div className={`w-14 h-14 border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] flex items-center justify-center flex-shrink-0 ${r.is_active ? 'bg-[#FFD700] text-black' : 'bg-gray-300 text-gray-500'}`}>
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2.5} d={getCategorySvgPath(r.category)} />
+                            </svg>
                           </div>
                           <div>
                             <p className="font-black text-xl text-black uppercase tracking-tight">{r.title}</p>
