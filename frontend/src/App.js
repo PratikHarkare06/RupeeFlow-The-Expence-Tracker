@@ -6,8 +6,9 @@ import {
   LineChart, Line, AreaChart, Area, CartesianGrid, ComposedChart, ReferenceLine
 } from 'recharts';
 
-import { auth } from './firebase';
+import { auth, db } from './firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 
 const API = process.env.REACT_APP_API_URL;
 
@@ -69,9 +70,20 @@ export function AuthProvider({ children }) {
   const register = async (email, password, fullName) => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      
+      let displayName = fullName || '';
       if (fullName) {
         await updateProfile(userCredential.user, { displayName: fullName });
       }
+
+      // Initialize user document in Firestore database
+      await setDoc(doc(db, "users", userCredential.user.uid), {
+        uid: userCredential.user.uid,
+        email: email,
+        full_name: displayName,
+        createdAt: serverTimestamp()
+      });
+
       return userCredential.user;
     } catch (error) {
       console.error('Firebase Registration failed:', error);
@@ -82,7 +94,20 @@ export function AuthProvider({ children }) {
   const googleLogin = async () => {
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      
+      // Check if user exists in Firestore, if not create them
+      const userDocRef = doc(db, "users", result.user.uid);
+      const docSnap = await getDoc(userDocRef);
+      if (!docSnap.exists()) {
+        await setDoc(userDocRef, {
+          uid: result.user.uid,
+          email: result.user.email,
+          full_name: result.user.displayName || "Google User",
+          createdAt: serverTimestamp()
+        });
+      }
+      
       return true;
     } catch (error) {
       console.error('Google Login failed:', error);
@@ -1654,8 +1679,8 @@ function App() {
                   : 'text-gray-500 hover:bg-gray-100 hover:text-black border-l-4 border-transparent'
               }`}
             >
-              <div className={activeTab === tab.id ? 'text-yellow-300' : 'text-gray-400'}>{tab.icon}</div>
-              <span className="flex-1">{tab.name}</span>
+              <div className={`flex-shrink-0 ${activeTab === tab.id ? 'text-yellow-300' : 'text-gray-400'}`}>{tab.icon}</div>
+              <span className="flex-1 text-left block">{tab.name}</span>
               {/* Budget alert dot on budgets tab */}
               {tab.id === 'budgets' && budgetAlerts.filter(a => !dismissedAlerts.has(a.budget_id)).length > 0 && (
                 <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0 animate-pulse" />
@@ -2055,7 +2080,7 @@ function App() {
                       <div className="flex-1 overflow-hidden">
                         <h2 className="text-2xl font-black text-white uppercase tracking-tight truncate" title={user?.full_name || 'User'}>{user?.full_name || 'User'}</h2>
                         <p className="text-gray-400 font-bold text-sm truncate" title={user?.email || 'No email'}>{user?.email || 'No email'}</p>
-                        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Member since {userDashboard?.account_info?.member_since ? new Date(userDashboard.account_info.member_since).toLocaleDateString() : 'Today'}</p>
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Member since {user?.metadata?.creationTime ? new Date(user.metadata.creationTime).toLocaleDateString() : 'Today'}</p>
                       </div>
                     </div>
                     <div className="flex flex-col space-y-2">
