@@ -6,6 +6,8 @@ import {
   LineChart, Line, AreaChart, Area, CartesianGrid, ComposedChart, ReferenceLine
 } from 'recharts';
 
+import { auth } from './firebase';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 
 const API = process.env.REACT_APP_API_URL;
 
@@ -33,110 +35,74 @@ axios.interceptors.response.use(
 
 // Auth Provider Component
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState({ id: 'dev-user', full_name: 'Development User', email: 'dev@rupeeflow.com' });
-  const [token, setToken] = useState('mock-token');
-  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Auth bypass: always set mock token and user
-    axios.defaults.headers.common['Authorization'] = `Bearer mock-token`;
-    setLoading(false);
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        setUser({ 
+          id: currentUser.uid, 
+          full_name: currentUser.displayName || 'Firebase User', 
+          email: currentUser.email 
+        });
+        axios.defaults.headers.common['Authorization'] = `Bearer mock-token`; // maintain backend access
+      } else {
+        setUser(null);
+        delete axios.defaults.headers.common['Authorization'];
+      }
+      setLoading(false);
+    });
+    return () => unsubscribe();
   }, []);
-
-  const fetchUserProfile = async () => {
-    try {
-      const response = await axios.get(`${API}/api/auth/me`);
-      setUser(response.data);
-    } catch (error) {
-      console.error('Failed to fetch user profile:', error);
-      logout();
-    }
-  };
 
   const login = async (email, password) => {
     try {
-      const formData = new URLSearchParams();
-      formData.append('username', email);
-      formData.append('password', password);
-      
-      const response = await axios.post(`${API}/api/auth/login`, formData, {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-      });
-      
-      const { access_token } = response.data;
-      localStorage.setItem('token', access_token);
-      setToken(access_token);
-      axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
-      
-      await fetchUserProfile();
-      setIsAuthenticated(true);
+      await signInWithEmailAndPassword(auth, email, password);
       return true;
     } catch (error) {
-      console.error('Login failed:', error);
-      throw new Error(error.response?.data?.detail || 'Invalid email or password');
+      console.error('Firebase Login failed:', error);
+      throw new Error(error.message || 'Invalid email or password');
     }
   };
 
   const register = async (email, password, fullName) => {
     try {
-      const response = await axios.post(`${API}/api/auth/register`, {
-        email,
-        password,
-        full_name: fullName
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Registration failed:', error);
-      if (error.response) {
-        // Server responded with an error
-        if (error.response.status === 400) {
-          const errorMessage = error.response.data.detail || 'Invalid registration data';
-          if (errorMessage.includes('already registered')) {
-            throw new Error('This email is already registered. Please try logging in instead.');
-          }
-          throw new Error(errorMessage);
-        } else if (error.response.status === 500) {
-          throw new Error('Server error. Please try again later.');
-        }
-      } else if (error.request) {
-        // Request was made but no response received
-        throw new Error('Unable to reach the server. Please check your internet connection.');
-      } else {
-        // Something else went wrong
-        throw new Error('An unexpected error occurred. Please try again.');
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      if (fullName) {
+        await updateProfile(userCredential.user, { displayName: fullName });
       }
-      throw error;
+      return userCredential.user;
+    } catch (error) {
+      console.error('Firebase Registration failed:', error);
+      throw new Error(error.message);
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    setToken(null);
+  const googleLogin = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+      return true;
+    } catch (error) {
+      console.error('Google Login failed:', error);
+      throw new Error(error.message);
+    }
+  };
+
+  const logout = async () => {
+    await signOut(auth);
     setUser(null);
-    setIsAuthenticated(false);
     delete axios.defaults.headers.common['Authorization'];
-    
-    // Clear all app specific data securely
-    setExpenses([]);
-    setBudgets([]);
-    setRecurringItems([]);
-    setGoals([]);
-    setGroups([]);
-    setSelectedGroup(null);
-    setGroupExpenses([]);
-    setAnalytics(null);
-    setInsights(null);
-    setUserDashboard(null);
-    setForecast(null);
-    setActiveTab('dashboard');
+    window.location.reload(); // clear all states securely
   };
 
   if (loading) {
-    return <div className="loading">Loading...</div>;
+    return <div className="min-h-screen bg-yellow-400 flex items-center justify-center font-black text-2xl border-4 border-black shadow-[8px_8px_0_0_rgba(0,0,0,1)] m-8 p-12">LOADING PROFILE...</div>;
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, isAuthenticated: true }}>
+    <AuthContext.Provider value={{ user, login, register, googleLogin, logout, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );
@@ -148,180 +114,101 @@ function RegisterForm({ onToggleForm }) {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [error, setError] = useState('');
-  const { register } = useContext(AuthContext);
+  const { register, googleLogin } = useContext(AuthContext);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-
-    // Basic validation
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters long');
-      return;
-    }
-
-    if (!email.includes('@')) {
-      setError('Please enter a valid email address');
-      return;
-    }
-
-    if (fullName.trim().length === 0) {
-      setError('Please enter your full name');
-      return;
-    }
+    if (password.length < 6) return setError('Password must be at least 6 characters long');
+    if (!email.includes('@')) return setError('Please enter a valid email address');
+    if (fullName.trim().length === 0) return setError('Please enter your full name');
 
     try {
       await register(email, password, fullName);
-      onToggleForm(); // Switch to login form after successful registration
+      onToggleForm(); 
     } catch (err) {
       const errorMessage = err.message || 'Registration failed';
       setError(errorMessage);
-      
-      // If email already exists, suggest login
-      if (errorMessage.includes('already registered')) {
-        setTimeout(() => {
-          if (window.confirm('This email is already registered. Would you like to go to the login page instead?')) {
-            onToggleForm();
-          }
-        }, 2000); // Show confirmation after 2 seconds
-      }
+    }
+  };
+
+  const handleGoogleAuth = async () => {
+    setError('');
+    try {
+      await googleLogin();
+    } catch (err) {
+      setError('Google Sign-In Failed: ' + err.message);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-blue-50 to-cyan-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        {/* Logo Section */}
-        <div className="text-center">
-          <div className="mx-auto w-16 h-16 bg-slate-700 rounded-md flex items-center justify-center shadow-lg">
-            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
+    <div className="min-h-screen flex items-center justify-center bg-[#FDE047] py-12 px-4 sm:px-6 lg:px-8 font-mono">
+      <div className="max-w-md w-full">
+        {/* Header */}
+        <div className="mb-8 text-center bg-white border-4 border-black shadow-[8px_8px_0_0_rgba(0,0,0,1)] p-6 transform -rotate-1">
+          <div className="mx-auto w-16 h-16 bg-[#10b981] border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] mb-4 flex items-center justify-center text-4xl">
+            💸
           </div>
-          <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
-            Create your account
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Join RupeeFlow today
-          </p>
+          <h2 className="text-4xl font-black text-black tracking-tighter uppercase">Join RupeeFlow</h2>
+          <p className="mt-2 text-sm font-bold text-gray-800 uppercase tracking-widest">Your smart financial companion</p>
         </div>
 
-        {/* Form Card */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-8">
+        {/* Card */}
+        <div className="bg-white border-4 border-black shadow-[8px_8px_0_0_rgba(0,0,0,1)] p-8">
           <form className="space-y-6" onSubmit={handleSubmit}>
             {error && (
-              <div className="rounded-xl bg-red-50 border border-red-200 p-4">
-                <div className="flex items-center">
-                  <svg className="w-5 h-5 text-red-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                  <div className="text-sm text-red-700">{error}</div>
-                </div>
+              <div className="bg-red-500 border-4 border-black p-4 text-white font-bold text-sm uppercase shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+                ⚠️ {error}
               </div>
             )}
             
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div>
-                <label htmlFor="full-name" className="block text-sm font-medium text-gray-700 mb-2">
-                  Full Name
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                  </div>
-                  <input
-                    id="full-name"
-                    name="fullName"
-                    type="text"
-                    required
-                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
-                    placeholder="Enter your full name"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                  />
-                </div>
+                <label className="block text-sm font-black text-black mb-2 uppercase tracking-wide">FULL NAME</label>
+                <input type="text" required value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="JOHN DOE"
+                  className="w-full px-4 py-3 border-4 border-black bg-gray-50 text-black font-bold focus:outline-none focus:bg-[#FEF08A] transition-colors shadow-[4px_4px_0_0_rgba(0,0,0,1)]" />
               </div>
               
               <div>
-                <label htmlFor="email-address" className="block text-sm font-medium text-gray-700 mb-2">
-                  Email address
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
-                    </svg>
-                  </div>
-                  <input
-                    id="email-address"
-                    name="email"
-                    type="email"
-                    required
-                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
-                    placeholder="Enter your email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
+                <label className="block text-sm font-black text-black mb-2 uppercase tracking-wide">EMAIL ADDRESS</label>
+                <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="JOHN@EXAMPLE.COM"
+                  className="w-full px-4 py-3 border-4 border-black bg-gray-50 text-black font-bold focus:outline-none focus:bg-[#FEF08A] transition-colors shadow-[4px_4px_0_0_rgba(0,0,0,1)]" />
               </div>
               
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                  Password
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                  </div>
-                  <input
-                    id="password"
-                    name="password"
-                    type="password"
-                    required
-                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </div>
+                <label className="block text-sm font-black text-black mb-2 uppercase tracking-wide">PASSWORD</label>
+                <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••"
+                  className="w-full px-4 py-3 border-4 border-black bg-gray-50 text-black font-bold focus:outline-none focus:bg-[#FEF08A] transition-colors shadow-[4px_4px_0_0_rgba(0,0,0,1)]" />
               </div>
             </div>
 
-            <div>
-              <button
-                type="submit"
-                className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-xl text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transform transition-all duration-200 hover:scale-[1.02] hover:shadow-lg"
-              >
-                <span className="absolute left-0 inset-y-0 flex items-center pl-3">
-                  <svg className="h-5 w-5 text-indigo-300 group-hover:text-indigo-200 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                  </svg>
-                </span>
-                Create Account
-              </button>
-            </div>
-            
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={onToggleForm}
-                className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors"
-              >
-                Already have an account? Sign in
-              </button>
-            </div>
+            <button type="submit" className="w-full flex justify-center items-center py-4 px-4 bg-[#6366f1] border-4 border-black text-white text-lg font-black uppercase tracking-widest shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none active:bg-[#4f46e5] transition-all">
+              CREATE ACCOUNT
+            </button>
           </form>
-        </div>
 
-        {/* Footer */}
-        <div className="text-center">
-          <p className="text-xs text-gray-500">
-            Your intelligent expense companion
-          </p>
+          <div className="mt-6 flex items-center justify-center space-x-4">
+             <div className="h-1 flex-1 bg-black"></div>
+             <span className="font-black uppercase tracking-widest text-sm">OR</span>
+             <div className="h-1 flex-1 bg-black"></div>
+          </div>
+
+          <button onClick={handleGoogleAuth} className="mt-6 w-full flex justify-center items-center py-4 px-4 bg-white border-4 border-black text-black text-lg font-black uppercase tracking-widest shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:translate-y-1 hover:shadow-none hover:bg-gray-50 transition-all">
+            <svg className="w-6 h-6 mr-3" viewBox="0 0 48 48">
+              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.7 17.74 9.5 24 9.5z"/>
+              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+              <path fill="none" d="M0 0h48v48H0z"/>
+            </svg>
+            Sign in with Google
+          </button>
+          
+          <div className="mt-8 text-center">
+            <button onClick={onToggleForm} className="font-black text-black hover:text-[#6366f1] uppercase tracking-widest border-b-4 border-black hover:border-[#6366f1] transition-colors pb-1">
+              ALREADY HAVE AN ACCOUNT? SIGN IN
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -333,146 +220,92 @@ function LoginForm({ onToggleForm }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { login } = useContext(AuthContext);
+  const { login, googleLogin } = useContext(AuthContext);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    
-    console.log('Login form submitted with:', { email, password: '***' });
-    
-    // Basic validation
-    if (!email || !password) {
-      setError('Please enter both email and password');
-      return;
-    }
-    
-    if (!email.includes('@')) {
-      setError('Please enter a valid email address');
-      return;
-    }
+    if (!email || !password) return setError('Please enter both email and password');
+    if (!email.includes('@')) return setError('Please enter a valid email address');
     
     try {
       await login(email, password);
-      console.log('Login successful, redirecting...');
     } catch (err) {
-      console.error('Login form error:', err);
-      const errorMessage = err.message || err.response?.data?.detail || 'Login failed. Please try again.';
-      setError(errorMessage);
+      setError(err.message || 'Login failed. Please try again.');
+    }
+  };
+
+  const handleGoogleAuth = async () => {
+    setError('');
+    try {
+      await googleLogin();
+    } catch (err) {
+      setError('Google Sign-In Failed: ' + err.message);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-blue-50 to-cyan-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        {/* Logo Section */}
-        <div className="text-center">
-          <div className="mx-auto w-16 h-16 bg-slate-700 rounded-md flex items-center justify-center shadow-lg">
-            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
+    <div className="min-h-screen flex items-center justify-center bg-[#10b981] py-12 px-4 sm:px-6 lg:px-8 font-mono">
+      <div className="max-w-md w-full">
+        {/* Header */}
+        <div className="mb-8 text-center bg-white border-4 border-black shadow-[8px_8px_0_0_rgba(0,0,0,1)] p-6 transform rotate-1">
+          <div className="mx-auto w-16 h-16 bg-[#FDE047] border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] mb-4 flex items-center justify-center text-4xl">
+            ⚡
           </div>
-          <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
-            Welcome back
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Sign in to RupeeFlow
-          </p>
+          <h2 className="text-4xl font-black text-black tracking-tighter uppercase">Welcome Back</h2>
+          <p className="mt-2 text-sm font-bold text-gray-800 uppercase tracking-widest">Sign in to RupeeFlow</p>
         </div>
 
-        {/* Form Card */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-8">
+        {/* Card */}
+        <div className="bg-white border-4 border-black shadow-[8px_8px_0_0_rgba(0,0,0,1)] p-8">
           <form className="space-y-6" onSubmit={handleSubmit}>
             {error && (
-              <div className="rounded-xl bg-red-50 border border-red-200 p-4">
-                <div className="flex items-center">
-                  <svg className="w-5 h-5 text-red-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                  <div className="text-sm text-red-700">{error}</div>
-                </div>
+              <div className="bg-red-500 border-4 border-black p-4 text-white font-bold text-sm uppercase shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+                ⚠️ {error}
               </div>
             )}
             
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div>
-                <label htmlFor="email-address" className="block text-sm font-medium text-gray-700 mb-2">
-                  Email address
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
-                    </svg>
-                  </div>
-                  <input
-                    id="email-address"
-                    name="email"
-                    type="email"
-                    required
-                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
-                    placeholder="Enter your email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
+                <label className="block text-sm font-black text-black mb-2 uppercase tracking-wide">EMAIL ADDRESS</label>
+                <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="JOHN@EXAMPLE.COM"
+                  className="w-full px-4 py-3 border-4 border-black bg-gray-50 text-black font-bold focus:outline-none focus:bg-[#A7F3D0] transition-colors shadow-[4px_4px_0_0_rgba(0,0,0,1)]" />
               </div>
               
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                  Password
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                  </div>
-                  <input
-                    id="password"
-                    name="password"
-                    type="password"
-                    required
-                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </div>
+                <label className="block text-sm font-black text-black mb-2 uppercase tracking-wide">PASSWORD</label>
+                <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••"
+                  className="w-full px-4 py-3 border-4 border-black bg-gray-50 text-black font-bold focus:outline-none focus:bg-[#A7F3D0] transition-colors shadow-[4px_4px_0_0_rgba(0,0,0,1)]" />
               </div>
             </div>
 
-            <div>
-              <button
-                type="submit"
-                className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-xl text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transform transition-all duration-200 hover:scale-[1.02] hover:shadow-lg"
-              >
-                <span className="absolute left-0 inset-y-0 flex items-center pl-3">
-                  <svg className="h-5 w-5 text-indigo-300 group-hover:text-indigo-200 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                  </svg>
-                </span>
-                Sign in
-              </button>
-            </div>
-            
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={onToggleForm}
-                className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors"
-              >
-                New user? Create an account
-              </button>
-            </div>
+            <button type="submit" className="w-full flex justify-center items-center py-4 px-4 bg-[#FF7F50] border-4 border-black text-white text-lg font-black uppercase tracking-widest shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:-translate-y-1 hover:shadow-[6px_6px_0_0_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none transition-all">
+              SIGN IN
+            </button>
           </form>
-        </div>
 
-        {/* Footer */}
-        <div className="text-center">
-          <p className="text-xs text-gray-500">
-            Your intelligent expense companion
-          </p>
+          <div className="mt-6 flex items-center justify-center space-x-4">
+             <div className="h-1 flex-1 bg-black"></div>
+             <span className="font-black uppercase tracking-widest text-sm">OR</span>
+             <div className="h-1 flex-1 bg-black"></div>
+          </div>
+
+          <button onClick={handleGoogleAuth} className="mt-6 w-full flex justify-center items-center py-4 px-4 bg-white border-4 border-black text-black text-lg font-black uppercase tracking-widest shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:-translate-y-1 hover:shadow-[6px_6px_0_0_rgba(0,0,0,1)] hover:bg-gray-50 active:translate-y-1 active:shadow-none transition-all">
+            <svg className="w-6 h-6 mr-3" viewBox="0 0 48 48">
+              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.7 17.74 9.5 24 9.5z"/>
+              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+              <path fill="none" d="M0 0h48v48H0z"/>
+            </svg>
+            Sign in with Google
+          </button>
+          
+          <div className="mt-8 text-center">
+            <button onClick={onToggleForm} className="font-black text-black hover:text-[#FF7F50] uppercase tracking-widest border-b-4 border-black hover:border-[#FF7F50] transition-colors pb-1">
+              NEW USER? CREATE AN ACCOUNT
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -2215,14 +2048,14 @@ function App() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-6">
                       <div className="w-20 h-20 bg-yellow-300 border-2 border-yellow-300 flex items-center justify-center shadow-[3px_3px_0_0_rgba(99,102,241,1)]">
-                        <span className="text-3xl text-black font-black">
-                          {userDashboard?.user_info?.full_name ? userDashboard.user_info.full_name.charAt(0).toUpperCase() : '👤'}
+                        <span className="text-3xl text-black font-black uppercase">
+                          {user?.full_name ? user.full_name.charAt(0).toUpperCase() : '👤'}
                         </span>
                       </div>
-                      <div className="flex-1">
-                        <h2 className="text-2xl font-black text-white uppercase tracking-tight">{userDashboard?.user_info?.full_name || 'User'}</h2>
-                        <p className="text-gray-400 font-bold text-sm">{userDashboard?.user_info?.email || 'No email'}</p>
-                        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Member since {userDashboard?.account_info?.member_since ? new Date(userDashboard.account_info.member_since).toLocaleDateString() : 'N/A'}</p>
+                      <div className="flex-1 overflow-hidden">
+                        <h2 className="text-2xl font-black text-white uppercase tracking-tight truncate" title={user?.full_name || 'User'}>{user?.full_name || 'User'}</h2>
+                        <p className="text-gray-400 font-bold text-sm truncate" title={user?.email || 'No email'}>{user?.email || 'No email'}</p>
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Member since {userDashboard?.account_info?.member_since ? new Date(userDashboard.account_info.member_since).toLocaleDateString() : 'Today'}</p>
                       </div>
                     </div>
                     <div className="flex flex-col space-y-2">
