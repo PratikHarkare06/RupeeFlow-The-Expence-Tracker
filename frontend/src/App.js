@@ -1564,11 +1564,18 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden font-sans antialiased">
+    <div className="flex h-[100dvh] bg-gray-50 overflow-hidden font-sans antialiased">
       {/* Left Sidebar — Neo-brutalism */}
+      {/* Mobile Backdrop when sidebar is open */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
       <aside
-        className={`hidden lg:flex flex-col flex-shrink-0 bg-white border-r-2 border-black transition-[width] duration-300 ease-in-out overflow-hidden ${
-          sidebarOpen ? 'w-64' : 'w-0 border-r-0'
+        className={`flex flex-col flex-shrink-0 bg-white border-r-2 border-black transition-[width] duration-300 ease-in-out overflow-hidden fixed lg:relative inset-y-0 left-0 z-50 h-[100dvh] lg:h-full ${
+          sidebarOpen ? 'w-80 lg:w-64' : 'w-0 border-r-0'
         }`}
       >
         {/* Logo */}
@@ -1672,7 +1679,10 @@ function App() {
           ].map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id);
+                if (window.innerWidth < 1024) setSidebarOpen(false);
+              }}
               className={`w-full flex items-center space-x-3 px-4 py-2.5 font-black text-[11px] uppercase tracking-widest transition-all duration-150 relative ${
                 activeTab === tab.id
                   ? 'bg-black text-yellow-300 border-l-4 border-yellow-300 pl-3'
@@ -1705,7 +1715,7 @@ function App() {
         {!sidebarOpen && (
           <button
             onClick={() => setSidebarOpen(true)}
-            className="hidden lg:flex fixed top-3 left-3 z-50 w-10 h-10 bg-black text-yellow-300 border-2 border-black items-center justify-center shadow-[3px_3px_0_0_rgba(0,0,0,0.3)] hover:bg-yellow-300 hover:text-black transition-colors duration-150"
+            className="flex fixed top-3 left-3 z-[60] w-10 h-10 bg-black text-yellow-300 border-2 border-black items-center justify-center shadow-[3px_3px_0_0_rgba(0,0,0,0.3)] hover:bg-yellow-300 hover:text-black transition-colors duration-150"
             title="Open sidebar"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1713,38 +1723,8 @@ function App() {
             </svg>
           </button>
         )}
-        <header className="lg:hidden bg-white shadow-sm border-b border-gray-200 z-10 p-2">
-          <div className="flex space-x-4 overflow-x-auto no-scrollbar items-center pb-1 px-2">
-            {[
-              { id: 'user-dashboard', name: 'Profile' },
-              { id: 'dashboard', name: 'Dashboard' },
-              { id: 'add-expense', name: 'Add Expense' },
-              { id: 'income', name: 'Income' },
-              { id: 'all-expenses', name: 'All Expenses' },
-              { id: 'receipt-scan', name: 'Scan Receipt' },
-              { id: 'groups', name: 'Wallets' },
-              { id: 'assistant', name: 'Assistant' },
-              { id: 'analytics', name: 'Analytics' },
-              { id: 'budgets', name: 'Budgets' },
-              { id: 'categories', name: 'Categories' },
-              { id: 'recurring', name: 'Recurring' },
-              { id: 'goals', name: 'Goals' },
-              { id: 'predictions', name: 'Predictions' }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex-shrink-0 px-4 py-2 rounded-full font-bold text-[10px] uppercase tracking-widest transition-colors ${
-                  activeTab === tab.id ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'
-                }`}
-              >
-                {tab.name}
-              </button>
-            ))}
-          </div>
-        </header>
 
-        <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-8 w-full max-w-7xl mx-auto pb-40">
+        <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-8 w-full max-w-7xl mx-auto pb-40">
 
           {/* ═══ GLOBAL BUDGET ALERTS BANNER ═══ */}
           {alertsVisible && budgetAlerts.filter(a => !dismissedAlerts.has(a.budget_id)).length > 0 && (
@@ -2070,20 +2050,20 @@ function App() {
               <>
                 {/* User Profile Card */}
                 <div className="bg-black border-2 border-black shadow-[4px_4px_0_0_rgba(99,102,241,1)] p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-6">
-                      <div className="w-20 h-20 bg-yellow-300 border-2 border-yellow-300 flex items-center justify-center shadow-[3px_3px_0_0_rgba(99,102,241,1)]">
-                        <span className="text-3xl text-black font-black uppercase">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center space-x-4 md:space-x-6 w-full md:w-auto overflow-hidden">
+                      <div className="w-16 h-16 md:w-20 md:h-20 flex-shrink-0 bg-yellow-300 border-2 border-yellow-300 flex items-center justify-center shadow-[3px_3px_0_0_rgba(99,102,241,1)]">
+                        <span className="text-2xl md:text-3xl text-black font-black uppercase">
                           {user?.full_name ? user.full_name.charAt(0).toUpperCase() : '👤'}
                         </span>
                       </div>
-                      <div className="flex-1 overflow-hidden">
-                        <h2 className="text-2xl font-black text-white uppercase tracking-tight truncate" title={user?.full_name || 'User'}>{user?.full_name || 'User'}</h2>
-                        <p className="text-gray-400 font-bold text-sm truncate" title={user?.email || 'No email'}>{user?.email || 'No email'}</p>
-                        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Member since {user?.metadata?.creationTime ? new Date(user.metadata.creationTime).toLocaleDateString() : 'Today'}</p>
+                      <div className="flex-1 min-w-0">
+                        <h2 className="text-xl md:text-2xl font-black text-white uppercase tracking-tight truncate" title={user?.full_name || 'User'}>{user?.full_name || 'User'}</h2>
+                        <p className="text-gray-400 font-bold text-xs md:text-sm truncate" title={user?.email || 'No email'}>{user?.email || 'No email'}</p>
+                        <p className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Member since {user?.metadata?.creationTime ? new Date(user.metadata.creationTime).toLocaleDateString() : 'Today'}</p>
                       </div>
                     </div>
-                    <div className="flex flex-col space-y-2">
+                    <div className="flex flex-col space-y-2 mt-2 md:mt-0 flex-shrink-0">
                       <button
                         onClick={logout}
                         className="px-4 py-2 text-sm font-black text-black bg-red-400 border-2 border-red-400 hover:bg-red-300 transition-colors shadow-[2px_2px_0_0_rgba(255,255,255,0.3)] uppercase tracking-widest"
