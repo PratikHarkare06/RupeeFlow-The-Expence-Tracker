@@ -1915,7 +1915,7 @@ function App() {
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                   <div className="h-[250px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                       <PieChart>
                         <Pie
                           data={Object.entries(getCategoryTotals()).sort(([,a], [,b]) => b - a).map(([name, value]) => ({ name, value }))}
@@ -2240,7 +2240,7 @@ function App() {
                         </div>
                       ) : (
                         <div className="h-64 w-full">
-                          <ResponsiveContainer width="100%" height="100%">
+                          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                             <ComposedChart data={userDashboard.monthly_trend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} barCategoryGap="35%">
                               <defs>
                                 <linearGradient id="barGradDash" x1="0" y1="0" x2="0" y2="1">
@@ -2791,7 +2791,7 @@ function App() {
                     </div>
                   ) : (
                     <div className="h-[260px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                         <ComposedChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} barCategoryGap="35%">
                           <defs>
                             <linearGradient id="barGradAnalytics" x1="0" y1="0" x2="0" y2="1">
@@ -2842,7 +2842,7 @@ function App() {
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
                       <div className="h-[220px]">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                           <PieChart>
                             <Pie data={categoryData} cx="50%" cy="50%" innerRadius={60} outerRadius={90}
                               paddingAngle={4} dataKey="value" stroke="#000" strokeWidth={2}>
