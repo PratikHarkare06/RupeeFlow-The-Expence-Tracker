@@ -304,12 +304,221 @@ Rules:
         else:
             return f"Expense - {category.lower()}"
 
+    async def process_with_nvidia_ocr(self, image_bytes: bytes, gemini_model=None) -> dict:
+        """Use NVIDIA NeMo Retriever OCR v1 to extract text, and optionally parse it with Gemini."""
+        import base64
+        import httpx
+        import os
+        
+        nvidia_api_key = os.environ.get("NVIDIA_API_KEY")
+        if not nvidia_api_key:
+            return {"success": False, "error": "NVIDIA_API_KEY not configured", "error_type": "configuration"}
+            
+        nim_url = os.environ.get("NVIDIA_NIM_URL", "https://integrate.api.nvidia.com/v1/cv/nvidia/nemoretriever-ocr-v1")
+        
+        img_b64 = base64.b64encode(image_bytes).decode("utf-8")
+        
+        mime_type = "image/jpeg"
+        if image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+            mime_type = "image/png"
+            
+        payload = {
+            "input": [
+                {
+                    "type": "image_url",
+                    "url": f"data:{mime_type};base64,{img_b64}"
+                }
+            ]
+        }
+        
+        headers = {
+            "Authorization": f"Bearer {nvidia_api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        try:
+            logging.info(f"Sending request to NVIDIA NeMo Retriever OCR at: {nim_url}")
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(nim_url, json=payload, headers=headers)
+                
+            if response.status_code != 200:
+                logging.error(f"NVIDIA NeMo Retriever OCR API failed with status {response.status_code}: {response.text}")
+                return {
+                    "success": False,
+                    "error": f"NVIDIA API error: {response.status_code}",
+                    "error_type": "nvidia_ocr_api"
+                }
+                
+            res_data = response.json()
+            text_list = []
+            
+            # Explicitly parse the standard NeMo Retriever OCR cloud API response schema
+            if isinstance(res_data, dict) and "data" in res_data:
+                data_list = res_data["data"]
+                if isinstance(data_list, list):
+                    for doc in data_list:
+                        if isinstance(doc, dict) and "text_detections" in doc:
+                            detections = doc["text_detections"]
+                            if isinstance(detections, list):
+                                for det in detections:
+                                    if isinstance(det, dict) and "text" in det:
+                                        text_list.append(det["text"])
+            
+            # Fallbacks for alternative formats / local container NIMs
+            if not text_list:
+                if isinstance(res_data, dict):
+                    text_list = res_data.get("text") or []
+                    if not text_list and "output" in res_data:
+                        output_data = res_data["output"]
+                        if isinstance(output_data, list) and len(output_data) > 0:
+                            if isinstance(output_data[0], dict):
+                                text_list = output_data[0].get("text") or []
+                            elif isinstance(output_data[0], str):
+                                text_list = output_data
+                        elif isinstance(output_data, dict):
+                            text_list = output_data.get("text") or []
+                elif isinstance(res_data, list):
+                    if len(res_data) > 0 and isinstance(res_data[0], dict):
+                        text_list = res_data[0].get("text") or []
+                        
+            if not text_list:
+                logging.warning(f"NVIDIA OCR returned no text. Full response: {res_data}")
+                def extract_strings_from_json(data):
+                    strings = []
+                    if isinstance(data, str):
+                        strings.append(data)
+                    elif isinstance(data, list):
+                        for item in data:
+                            strings.extend(extract_strings_from_json(item))
+                    elif isinstance(data, dict):
+                        for k, v in data.items():
+                            if k == "text" and isinstance(v, str):
+                                strings.append(v)
+                            else:
+                                strings.extend(extract_strings_from_json(v))
+                    return strings
+                text_list = extract_strings_from_json(res_data)
+
+                
+            if not text_list:
+                return {
+                    "success": False,
+                    "error": "No text detected in the receipt by NVIDIA OCR.",
+                    "error_type": "empty_ocr"
+                }
+                
+            raw_text = "\n".join(text_list)
+            logging.info(f"NVIDIA NeMo Retriever OCR extracted {len(raw_text)} chars of text.")
+            
+            if gemini_model is not None:
+                logging.info("Parsing NVIDIA OCR text using Gemini...")
+                try:
+                    prompt = f"""You are an expert receipt parser. Analyze this raw text extracted from a receipt and return a JSON object with these fields:
+{{
+  "amount": <total amount as float, e.g. 1250.50>,
+  "date": "<date in YYYY-MM-DD format, e.g. 2024-03-15>",
+  "merchant": "<store/restaurant/vendor name>",
+  "category": "<one of: Food & Dining, Groceries & Household, Transportation, Shopping & Clothes, Bills & Utilities, Mobile & Internet, Healthcare, Entertainment, Travel & Vacation, Education & Courses, Home & Family, Personal Care, Gifts & Festivals, EMI & Loans, Investments & SIP, Other>",
+  "description": "<brief 1-line description, e.g. 'Dinner at Pizza Hut'>",
+  "items": [{{"name": "<item>", "amount": <float>, "quantity": <int>}}],
+  "raw_text": "<full text extracted from receipt>"
+}}
+
+Rules:
+- Return ONLY the JSON, no markdown, no extra text.
+- If a field cannot be determined, use null.
+- For amount, extract the TOTAL/GRAND TOTAL.
+- For category, choose the single best matching category.
+- For date, convert any format to YYYY-MM-DD.
+
+Raw receipt text:
+{raw_text}
+"""
+                    response = await asyncio.to_thread(gemini_model.generate_content, prompt)
+                    text_resp = getattr(response, "text", "") or ""
+                    text_resp = text_resp.strip()
+                    if text_resp.startswith("```"):
+                        text_resp = re.sub(r"```[a-z]*\n?", "", text_resp).strip().rstrip("```").strip()
+                        
+                    parsed = json.loads(text_resp)
+                    
+                    amount = parsed.get("amount")
+                    if amount is not None:
+                        amount = float(amount)
+                        
+                    return {
+                        "success": True,
+                        "amount": amount,
+                        "date": parsed.get("date") or datetime.now().strftime("%Y-%m-%d"),
+                        "merchant": parsed.get("merchant"),
+                        "category": parsed.get("category", "Other"),
+                        "category_confidence": "high",
+                        "category_reason": "Parsed by Gemini via NVIDIA OCR text",
+                        "description": parsed.get("description") or f"Purchase at {parsed.get('merchant', 'Unknown')}",
+                        "items": parsed.get("items") or [],
+                        "raw_text": raw_text,
+                        "needs_confirmation": False
+                    }
+                except Exception as e:
+                    logging.error(f"Gemini parsing of NVIDIA OCR text failed: {e}")
+            
+            logging.info("Using local regex parsers to process NVIDIA OCR text...")
+            amount = self.extract_amount(raw_text)
+            date = self.extract_date(raw_text)
+            merchant = self.extract_merchant(raw_text)
+            items = self.extract_line_items(raw_text)
+            category_result = self.categorize_expense(raw_text, merchant or "")
+            category = category_result["category"]
+            description = self.generate_description(merchant or "", items, category)
+            
+            if not amount:
+                return {
+                    "success": False,
+                    "error": "Could not find a valid amount in NeMo OCR text. Ensure the receipt is clear.",
+                    "error_type": "validation",
+                    "raw_text": raw_text[:500]
+                }
+                
+            return {
+                "success": True,
+                "amount": amount,
+                "date": date or datetime.now().strftime("%Y-%m-%d"),
+                "merchant": merchant,
+                "category": category,
+                "category_confidence": category_result["confidence"],
+                "category_reason": category_result["reason"] + " (via NVIDIA NeMo OCR)",
+                "description": description,
+                "items": items,
+                "raw_text": raw_text,
+                "needs_confirmation": category_result["confidence"] == "low"
+            }
+            
+        except Exception as e:
+            logging.error(f"NVIDIA NeMo OCR processing error: {e}")
+            return {
+                "success": False,
+                "error": f"NVIDIA OCR failed: {str(e)}",
+                "error_type": "nvidia_ocr_failed"
+            }
+
     async def process_receipt(self, image_bytes, gemini_model=None) -> dict:
         """
-        Process a receipt image. Uses Gemini Vision if available (primary),
-        falls back to Tesseract OCR pipeline.
+        Process a receipt image. Uses NVIDIA NeMo Retriever OCR if available,
+        otherwise falls back to Gemini Vision (primary) and Tesseract OCR (secondary).
         """
-        # ── Primary: Gemini Vision ──
+        import os
+        
+        # ── Primary: NVIDIA NeMo Retriever OCR ──
+        if os.environ.get("NVIDIA_API_KEY"):
+            logging.info("NVIDIA_API_KEY found. Utilizing NVIDIA NeMo Retriever OCR v1 for receipt processing.")
+            result = await self.process_with_nvidia_ocr(image_bytes, gemini_model=gemini_model)
+            if result.get("success"):
+                logging.info(f"NVIDIA OCR success: amount={result.get('amount')}, merchant={result.get('merchant')}")
+                return result
+            else:
+                logging.warning(f"NVIDIA OCR failed: {result.get('error')} — falling back to Gemini/Tesseract")
+
+        # ── Secondary: Gemini Vision ──
         if gemini_model is not None:
             logging.info("Using Gemini Vision for receipt processing")
             result = await self.process_with_gemini_vision(image_bytes, gemini_model)
@@ -323,7 +532,7 @@ Rules:
         if not self._tesseract_available:
             return {
                 "success": False,
-                "error": "No OCR engine available. Configure GEMINI_API_KEY or install Tesseract.",
+                "error": "No OCR engine available. Configure NVIDIA_API_KEY, GEMINI_API_KEY or install Tesseract.",
                 "error_type": "configuration"
             }
 
