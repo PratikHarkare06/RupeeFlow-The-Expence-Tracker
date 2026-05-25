@@ -1559,6 +1559,50 @@ async def ai_assistant_chat(request: dict, current_user: User = Depends(get_curr
         User question: {user_query}
         """
         
+        # ── NVIDIA NIM Chat Completion Integration
+        nvidia_api_key = os.environ.get("NVIDIA_API_KEY")
+        if nvidia_api_key and nvidia_api_key.startswith("nvapi-"):
+            logging.info("Using NVIDIA NIM for AI chat assistant")
+            for attempt in range(2):
+                try:
+                    def query_nvidia():
+                        import requests
+                        url = "https://integrate.api.nvidia.com/v1/chat/completions"
+                        headers = {
+                            "Authorization": f"Bearer {nvidia_api_key}",
+                            "Content-Type": "application/json"
+                        }
+                        payload = {
+                            "model": "meta/llama-3.1-70b-instruct",
+                            "messages": [
+                                {"role": "system", "content": "You are a helpful, professional personal finance advisor named RupeeFlow AI Assistant."},
+                                {"role": "user", "content": context}
+                            ],
+                            "temperature": 0.2,
+                            "max_tokens": 1500
+                        }
+                        res = requests.post(url, headers=headers, json=payload, timeout=30)
+                        res.raise_for_status()
+                        return res.json()["choices"][0]["message"]["content"]
+                    
+                    ai_response = await asyncio.to_thread(query_nvidia)
+                    if ai_response.strip():
+                        return {
+                            "answer": ai_response,
+                            "data": {
+                                "total_expenses": len(expenses),
+                                "total_spent": total_spent,
+                                "category_breakdown": category_totals,
+                                "recent_expenses": expenses[:5]
+                            },
+                            "is_ai_response": True
+                        }
+                except Exception as e:
+                    logging.warning(f"NVIDIA Chat failed (attempt {attempt+1}): {str(e)}")
+                    if attempt == 0:
+                        await asyncio.sleep(0.5)
+            logging.error("NVIDIA NIM AI assistant failed, falling back to Gemini")
+
         if not gemini_model:
             return {
                 "answer": "Advanced AI features are currently unavailable. Please verify GEMINI_API_KEY and try again.",
