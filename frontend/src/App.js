@@ -761,7 +761,9 @@ function App() {
   const fetchForecast = async () => {
     try {
       setLoadingForecast(true);
-      const res = await axios.get(`${API}/api/ai/forecast`);
+      const res = await axios.get(`${API}/api/ai/forecast`, {
+        timeout: 60000 // 60 seconds for AI forecasting
+      });
       if (res.data.success) setForecast(res.data.forecast);
     } catch (e) { console.error('Failed to fetch forecast:', e); }
     finally { setLoadingForecast(false); }
@@ -1051,7 +1053,8 @@ function App() {
       const response = await axios.post(`${API}/api/expenses/receipt`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
-        }
+        },
+        timeout: 120000 // 120 seconds for receipt OCR and AI processing
       });
 
       if (response.data.success && response.data.extracted_data) {
@@ -1182,6 +1185,8 @@ function App() {
       try {
         const response = await axios.post(`${API}/api/ai-assistant/chat`, {
           query: question
+        }, {
+          timeout: 60000 // 60 seconds for AI assistant chat
         });
         
         const aiResponse = response.data;
