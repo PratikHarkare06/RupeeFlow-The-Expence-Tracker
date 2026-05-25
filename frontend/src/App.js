@@ -3987,7 +3987,7 @@ function App() {
                           className="px-3 py-1 border-2 border-black text-[10px] font-black uppercase tracking-wider hover:bg-yellow-300 hover:shadow-[1px_1px_0_0_rgba(0,0,0,1)] transition-all">
                           Edit
                         </button>
-                        <button onClick={() => { if(window.confirm('Delete this expense?')) axios.delete(`${API}/api/expenses/${exp.id}`).then(fetchExpenses); }}
+                        <button onClick={() => deleteExpense(exp.id)}
                           className="px-3 py-1 border-2 border-black text-[10px] font-black uppercase tracking-wider hover:bg-red-500 hover:text-white hover:border-red-500 transition-all">
                           Del
                         </button>
