@@ -3918,7 +3918,7 @@ function App() {
           </div>
 
           {/* Filter Bar */}
-          <div className="bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="bg-white border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] p-4 grid grid-cols-1 md:grid-cols-5 gap-3">
             <div className="md:col-span-1 relative">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
               <input value={expenseSearch} onChange={e => { setExpenseSearch(e.target.value); setExpensePage(1); }}
@@ -3937,7 +3937,7 @@ function App() {
               <option value="amount-desc">Amount: High → Low</option>
               <option value="amount-asc">Amount: Low → High</option>
             </select>
-            <div className="flex gap-2">
+            <div className="flex gap-2 md:col-span-2">
               <input type="date" value={expenseDateFrom} onChange={e => { setExpenseDateFrom(e.target.value); setExpensePage(1); }}
                 className="flex-1 border-2 border-black px-2 py-2 text-xs font-semibold focus:outline-none" title="From date" />
               <input type="date" value={expenseDateTo} onChange={e => { setExpenseDateTo(e.target.value); setExpensePage(1); }}
