@@ -1006,7 +1006,7 @@ function App() {
           ...payload,
           title: expenseForm.description // Legacy field name for backward compatibility
         });
-        setActiveTab('expenses');
+        setActiveTab('all-expenses');
       }
       
       // Reset form
@@ -1075,7 +1075,7 @@ function App() {
           await fetchExpenses();
           await fetchAnalytics();
           await fetchInsights();
-          setActiveTab('expenses');
+          setActiveTab('all-expenses');
           alert(response.data.message || 'Receipt processed and expense created automatically!');
         } else {
           // Show success message for manual review
@@ -2653,7 +2653,7 @@ function App() {
                                 </div>
                                 {m.data.expenses.length > 5 && (
                                   <button 
-                                    onClick={() => setActiveTab('expenses')}
+                                    onClick={() => setActiveTab('all-expenses')}
                                     className="w-full text-center mt-4 p-3 text-xs bg-[#FFD700] text-black font-black hover:bg-[#F2C900] border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] uppercase tracking-widest transition-all active:translate-y-px"
                                   >
                                     VIEW ALL {m.data.expenses.length} TRANSACTIONS →
