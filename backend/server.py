@@ -165,7 +165,7 @@ class ExpenseBase(BaseModel):
     category: str
     description: Optional[str] = None
     receipt_url: Optional[str] = None
-    user_id: str
+    user_id: Optional[str] = None
     # Additional extracted data from receipt processing
     merchant: Optional[str] = None
     items: Optional[List[dict]] = None
