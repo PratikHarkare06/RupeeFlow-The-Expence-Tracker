@@ -310,9 +310,9 @@ Rules:
         import httpx
         import os
         
-        nvidia_api_key = os.environ.get("NVIDIA_API_KEY")
+        nvidia_api_key = os.environ.get("NVIDIA_OCR_API_KEY") or os.environ.get("NVIDIA_API_KEY")
         if not nvidia_api_key:
-            return {"success": False, "error": "NVIDIA_API_KEY not configured", "error_type": "configuration"}
+            return {"success": False, "error": "NVIDIA API Key not configured. Set NVIDIA_OCR_API_KEY or NVIDIA_API_KEY.", "error_type": "configuration"}
             
         nim_url = os.environ.get("NVIDIA_NIM_URL", "https://integrate.api.nvidia.com/v1/cv/nvidia/nemoretriever-ocr-v1")
         
@@ -509,8 +509,8 @@ Raw receipt text:
         import os
         
         # ── Primary: NVIDIA NeMo Retriever OCR ──
-        if os.environ.get("NVIDIA_API_KEY"):
-            logging.info("NVIDIA_API_KEY found. Utilizing NVIDIA NeMo Retriever OCR v1 for receipt processing.")
+        if os.environ.get("NVIDIA_OCR_API_KEY") or os.environ.get("NVIDIA_API_KEY"):
+            logging.info("NVIDIA OCR API key found. Utilizing NVIDIA NeMo Retriever OCR v1 for receipt processing.")
             result = await self.process_with_nvidia_ocr(image_bytes, gemini_model=gemini_model)
             if result.get("success"):
                 logging.info(f"NVIDIA OCR success: amount={result.get('amount')}, merchant={result.get('merchant')}")
