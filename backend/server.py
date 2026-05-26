@@ -2072,6 +2072,17 @@ async def get_group_settlements(group_id: str, current_user: User = Depends(get_
         logging.error(f"Failed to calculate settlements: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail="Failed to calculate settlements")
 
+@app.get("/")
+async def root():
+    """Welcome page confirming the API is active."""
+    return {
+        "status": "online",
+        "service": "RupeeFlow Backend API",
+        "version": "1.0.0",
+        "documentation": "/docs",
+        "author": "AntigravityPairProgramming"
+    }
+
 # Include routers
 app.include_router(api_router)
 
