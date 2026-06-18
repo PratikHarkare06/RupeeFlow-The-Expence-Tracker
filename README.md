@@ -37,9 +37,10 @@ RupeeFlow is a full-stack expense tracking platform that combines **AI-driven in
 
 ### 📸 Receipt Scanning (OCR)
 - **Upload Receipt Images** — PNG, JPG, JPEG supported
-- **AI Data Extraction** — Gemini Vision extracts: merchant name, total amount, date, currency, tax, items
-- **Multi-Currency Receipt Support** — Auto-detects currency and converts to INR
-- **Auto-Fill Form** — Extracted data pre-populates the expense form for quick confirmation
+- **Dual-Engine AI Extraction** — Uses **NVIDIA NeMo Retriever OCR** for high-accuracy text extraction, with automatic robust fallback to **Gemini Vision** and local Regex parsers.
+- **Smart Data Parsing** — Automatically extracts: merchant name, total amount, date, currency, and line items.
+- **Multi-Currency Receipt Support** — Auto-detects foreign currencies (USD, EUR, GBP, JPY), converts to INR for your dashboard, and permanently saves the original currency for reference.
+- **Auto-Fill & Auto-Save** — High-confidence receipts are automatically saved to your database, while others pre-populate the expense form for quick confirmation.
 
 ### 🌍 Multi-Currency Support
 - **5 Currencies** — INR, USD, EUR, GBP, JPY
@@ -117,7 +118,8 @@ RupeeFlow is a full-stack expense tracking platform that combines **AI-driven in
 | **FastAPI** | Async Python web framework |
 | **Motor (AsyncIOMotorClient)** | Async MongoDB driver |
 | **MongoDB** | NoSQL database |
-| **Google Generative AI (Gemini)** | AI chat, categorization, forecasting, OCR |
+| **Google Generative AI (Gemini)** | AI chat, categorization, forecasting, OCR fallback |
+| **NVIDIA NeMo API** | Primary high-accuracy OCR text extraction |
 | **python-jose (JWT)** | Authentication tokens |
 | **Passlib + Bcrypt** | Password hashing |
 | **SlowAPI** | Rate limiting |
@@ -480,13 +482,12 @@ MIT License — see [LICENSE](LICENSE) for details.
 │  • Sidebar + 11 tabs     │                         │  • Gemini AI integration │
 └──────────────────────────┘                         └──────────┬───────────────┘
                                                                 │
-                                          ┌─────────────────────┼──────────────┐
-                                          │                     │              │
-                                   ┌──────▼──────┐   ┌─────────▼──────┐  ┌────▼────────┐
-                                   │   MongoDB   │   │  Google Gemini │  │ ExchangeRate│
-                                   │  (Motor)    │   │   AI (Vision,  │  │    API      │
-                                   │             │   │   Chat, NLP)   │  │  (Cached)   │
-                                   └─────────────┘   └────────────────┘  └─────────────┘
+                                           ┌─────────────────────┼─────────────────────────┐
+                                           │                     │                         │
+                                    ┌──────▼──────┐   ┌─────────▼─────────────┐  ┌─────────▼────────────┐
+                                    │   MongoDB   │   │ NVIDIA NeMo & Gemini  │  │   ExchangeRate API   │
+                                    │  (Motor)    │   │  (OCR, AI Chat, NLP)  │  │      (Cached)        │
+                                    └─────────────┘   └───────────────────────┘  └──────────────────────┘
 ```
 
 ---
