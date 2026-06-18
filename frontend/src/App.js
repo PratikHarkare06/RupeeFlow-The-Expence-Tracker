@@ -1063,6 +1063,7 @@ function App() {
         
         // Auto-fill form with extracted data
         if (data.amount) setExpenseForm(prev => ({ ...prev, amount: data.amount.toString() }));
+        if (data.original_currency) setExpenseForm(prev => ({ ...prev, original_currency: data.original_currency }));
         if (data.description) setExpenseForm(prev => ({ ...prev, description: data.description }));
         if (data.merchant) setExpenseForm(prev => ({ ...prev, merchant: data.merchant }));
         if (data.category) setExpenseForm(prev => ({ ...prev, category: data.category }));
@@ -1535,6 +1536,20 @@ function App() {
       currency: currencyCode,
       minimumFractionDigits: currencyCode === 'JPY' ? 0 : 2
     }).format(converted);
+  };
+
+  const formatRawCurrency = (amount, currencyCode = 'INR') => {
+    let locale = 'en-IN';
+    if (currencyCode === 'USD' || currencyCode === 'CAD' || currencyCode === 'AUD') locale = 'en-US';
+    if (currencyCode === 'EUR') locale = 'de-DE';
+    if (currencyCode === 'GBP') locale = 'en-GB';
+    if (currencyCode === 'JPY') locale = 'ja-JP';
+
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: currencyCode,
+      minimumFractionDigits: currencyCode === 'JPY' ? 0 : 2
+    }).format(amount);
   };
 
   const getTotalExpenses = () => {
@@ -2521,7 +2536,7 @@ function App() {
                       <span className="text-green-500">✅</span> Extracted Data
                     </h4>
                     <div className="grid grid-cols-2 gap-4 text-sm text-black font-medium">
-                      <div className="bg-white border border-gray-200 p-3"><span className="text-gray-500 font-bold block text-xs mb-1">Amount</span> {extractedData.amount ? formatCurrency(extractedData.amount) : 'Not found'}</div>
+                      <div className="bg-white border border-gray-200 p-3"><span className="text-gray-500 font-bold block text-xs mb-1">Amount</span> {extractedData.amount ? formatRawCurrency(extractedData.amount, extractedData.original_currency || 'INR') : 'Not found'}</div>
                       <div className="bg-white border border-gray-200 p-3"><span className="text-gray-500 font-bold block text-xs mb-1">Date</span> {extractedData.date || 'Not found'}</div>
                       <div className="bg-white border border-gray-200 p-3 col-span-2"><span className="text-gray-500 font-bold block text-xs mb-1">Merchant</span> {extractedData.merchant || 'Not found'}</div>
                       <div className="bg-white border border-gray-200 p-3"><span className="text-gray-500 font-bold block text-xs mb-1">Description</span> {extractedData.description || 'Not found'}</div>
@@ -2537,7 +2552,7 @@ function App() {
                             {(extractedData.items || []).map((it, idx) => (
                               <li key={idx} className="flex justify-between items-center px-4 py-2 hover:bg-gray-50">
                                 <span className="font-medium text-black text-sm">{it.quantity > 1 && <span className="text-gray-500 mr-2">{it.quantity}x</span>}{it.name || 'Item'}</span>
-                                <span className="font-bold text-black text-sm">{formatCurrency(Number(it.amount || 0))}</span>
+                                <span className="font-bold text-black text-sm">{formatRawCurrency(Number(it.amount || 0), extractedData.original_currency || 'INR')}</span>
                               </li>
                             ))}
                           </ul>
@@ -3980,7 +3995,16 @@ function App() {
                       <span className="inline-block bg-gray-100 border border-gray-300 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-gray-700">{exp.category || '—'}</span>
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-500 font-medium">{exp.merchant || '—'}</td>
-                    <td className="px-4 py-3 text-right font-black text-black whitespace-nowrap">₹{(exp.amount || 0).toLocaleString('en-IN', {maximumFractionDigits:2})}</td>
+                    <td className="px-4 py-3 text-right font-black text-black whitespace-nowrap">
+                      {exp.original_currency && exp.original_currency !== 'INR' ? (
+                        <div className="flex flex-col items-end">
+                          <span>{formatRawCurrency(exp.original_amount || exp.amount, exp.original_currency)}</span>
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">≈ ₹{(exp.amount || 0).toLocaleString('en-IN', {maximumFractionDigits:2})}</span>
+                        </div>
+                      ) : (
+                        `₹${(exp.amount || 0).toLocaleString('en-IN', {maximumFractionDigits:2})}`
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button onClick={() => openEditExpense(exp)}

@@ -53,6 +53,7 @@ class ReceiptProcessor:
             prompt = """You are an expert receipt parser. Analyse this receipt image and return a JSON object with these fields:
 {
   "amount": <total amount as float, e.g. 1250.50>,
+  "original_currency": "<one of: INR, USD, EUR, GBP>",
   "date": "<date in YYYY-MM-DD format, e.g. 2024-03-15>",
   "merchant": "<store/restaurant/vendor name>",
   "category": "<one of: Food & Dining, Groceries & Household, Transportation, Shopping & Clothes, Bills & Utilities, Mobile & Internet, Healthcare, Entertainment, Travel & Vacation, Education & Courses, Home & Family, Personal Care, Gifts & Festivals, EMI & Loans, Investments & SIP, Other>",
@@ -179,18 +180,44 @@ Rules:
             raise Exception(f"Text extraction failed: {str(e)}")
 
     def extract_amount(self, text: str) -> Optional[float]:
-        total_patterns = [
-            r'(?:grand total|grandtotal|net amount|amount payable|amount to pay|total amount|bill total)[:\s]*₹?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)',
-            r'(?:total)[:\s]*₹?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)'
+        # 1. Try to find the max of all amounts explicitly marked with a currency symbol
+        amounts_with_currency = re.findall(r'(?:[₹$€£]|Rs\.?|INR)\s*(\d+(?:,\d{3})*(?:\.\d{2})?)', text, re.IGNORECASE)
+        numeric_curr = []
+        for a in amounts_with_currency:
+            try:
+                numeric_curr.append(float(a.replace(',', '')))
+            except:
+                continue
+        if numeric_curr:
+            return max(numeric_curr)
+
+        # 2. Try to find "total" on the SAME line as a number
+        total_patterns_same_line = [
+            r'\b(?:grand total|grandtotal|net amount|amount payable|amount to pay|total amount|total charges|total amount due|bill total)\b[^\n\d]*?(\d+(?:,\d{3})*(?:\.\d{2})?)',
+            r'\b(?:total)\b[^\n\d]*?(\d+(?:,\d{3})*(?:\.\d{2})?)'
         ]
-        for pat in total_patterns:
+        for pat in total_patterns_same_line:
             m = re.search(pat, text, re.IGNORECASE)
             if m:
                 try:
                     return float(m.group(1).replace(',', ''))
                 except:
                     continue
-        amounts = re.findall(r'₹?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)', text)
+
+        # 3. Try finding "total" across newlines (fallback)
+        total_patterns_any = [
+            r'\b(?:grand total|total amount due)\b[^\d]*?(\d+(?:,\d{3})*(?:\.\d{2})?)'
+        ]
+        for pat in total_patterns_any:
+            m = re.search(pat, text, re.IGNORECASE)
+            if m:
+                try:
+                    return float(m.group(1).replace(',', ''))
+                except:
+                    continue
+
+        # 4. Fallback to max of any decimal numbers
+        amounts = re.findall(r'\b(\d+(?:,\d{3})*\.\d{2})\b', text)
         numeric = []
         for a in amounts:
             try:
@@ -199,7 +226,17 @@ Rules:
                 continue
         if numeric:
             return max(numeric)
+            
         return None
+
+    def extract_currency(self, text: str) -> str:
+        if re.search(r'\$', text) or re.search(r'\b(?:USD|dollars?)\b', text, re.IGNORECASE):
+            return "USD"
+        elif re.search(r'€', text) or re.search(r'\b(?:EUR|euros?)\b', text, re.IGNORECASE):
+            return "EUR"
+        elif re.search(r'£', text) or re.search(r'\b(?:GBP|pounds?)\b', text, re.IGNORECASE):
+            return "GBP"
+        return "INR"
 
     def extract_date(self, text: str) -> Optional[str]:
         date_patterns = [
@@ -264,18 +301,24 @@ Rules:
     def extract_line_items(self, text: str) -> List[Dict]:
         items = []
         lines = text.split('\n')
-        for line in lines:
-            if re.search(r'(total|subtotal|gst|tax|discount|amount payable|grand total|net amount)', line, re.IGNORECASE):
+        for i, line in enumerate(lines):
+            if re.search(r'(total|subtotal|gst|tax|discount|amount payable|grand total|net amount|amount due)', line, re.IGNORECASE):
+                continue
+            if i > 0 and re.search(r'(total|subtotal|gst|tax|discount|amount payable|grand total|net amount|amount due)', lines[i-1], re.IGNORECASE):
                 continue
             m = re.search(r'([\d,]+(?:\.\d{2}))\s*$', line)
             if not m:
-                m = re.search(r'₹\s*([\d,]+(?:\.\d{2}))', line)
+                m = re.search(r'[₹$€£]\s*([\d,]+(?:\.\d{2}))', line)
             if m:
                 try:
                     amount = float(m.group(1).replace(',', ''))
                 except:
                     continue
                 name_part = line[:m.start()].strip()
+                if not name_part and i > 0:
+                    prev_line = lines[i-1].strip()
+                    if not re.search(r'(total|subtotal|gst|tax|discount|amount payable|grand total|net amount|amount due)', prev_line, re.IGNORECASE):
+                        name_part = prev_line
                 qty = 1
                 qmatch = re.search(r'(?:(\d+)\s*[xX]|[xX]\s*(\d+))', name_part)
                 if qmatch:
@@ -449,6 +492,7 @@ Raw receipt text:
                     return {
                         "success": True,
                         "amount": amount,
+                        "original_currency": parsed.get("original_currency", "INR"),
                         "date": parsed.get("date") or datetime.now().strftime("%Y-%m-%d"),
                         "merchant": parsed.get("merchant"),
                         "category": parsed.get("category", "Other"),
@@ -464,6 +508,7 @@ Raw receipt text:
             
             logging.info("Using local regex parsers to process NVIDIA OCR text...")
             amount = self.extract_amount(raw_text)
+            currency = self.extract_currency(raw_text)
             date = self.extract_date(raw_text)
             merchant = self.extract_merchant(raw_text)
             items = self.extract_line_items(raw_text)
@@ -482,6 +527,7 @@ Raw receipt text:
             return {
                 "success": True,
                 "amount": amount,
+                "original_currency": currency,
                 "date": date or datetime.now().strftime("%Y-%m-%d"),
                 "merchant": merchant,
                 "category": category,

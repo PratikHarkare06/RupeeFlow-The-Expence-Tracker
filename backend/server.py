@@ -1362,10 +1362,24 @@ async def upload_receipt(
         
         if result.get("amount") and result.get("description"):
             try:
+                orig_currency = result.get("original_currency", "INR")
+                orig_amount = float(result["amount"])
+                
+                if orig_currency != "INR":
+                    inr_amt, rate = await convert_to_inr(orig_amount, orig_currency)
+                    final_amount = round(inr_amt, 2)
+                    exchange_rate = rate
+                else:
+                    final_amount = orig_amount
+                    exchange_rate = 1.0
+
                 # Create expense with ALL extracted data (regardless of confidence)
                 expense_data = {
                     "title": result["description"],
-                    "amount": float(result["amount"]),
+                    "amount": final_amount,
+                    "original_currency": orig_currency,
+                    "original_amount": orig_amount,
+                    "exchange_rate": exchange_rate,
                     "date": result.get("date", datetime.now().strftime("%Y-%m-%d")),
                     "category": result.get("category", "Other"),
                     "description": result["description"],
