@@ -353,11 +353,11 @@ Rules:
         import httpx
         import os
         
-        nvidia_api_key = os.environ.get("NVIDIA_OCR_API_KEY") or os.environ.get("NVIDIA_API_KEY")
+        nvidia_api_key = (os.environ.get("NVIDIA_OCR_API_KEY") or os.environ.get("NVIDIA_API_KEY") or "").strip()
         if not nvidia_api_key:
             return {"success": False, "error": "NVIDIA API Key not configured. Set NVIDIA_OCR_API_KEY or NVIDIA_API_KEY.", "error_type": "configuration"}
             
-        nim_url = os.environ.get("NVIDIA_NIM_URL", "https://integrate.api.nvidia.com/v1/cv/nvidia/nemoretriever-ocr-v1")
+        nim_url = os.environ.get("NVIDIA_NIM_URL", "https://integrate.api.nvidia.com/v1/cv/nvidia/nemoretriever-ocr-v1").strip()
         
         img_b64 = base64.b64encode(image_bytes).decode("utf-8")
         
