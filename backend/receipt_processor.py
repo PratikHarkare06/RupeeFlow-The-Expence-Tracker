@@ -508,6 +508,8 @@ Raw receipt text:
         """
         import os
         
+        errors = []
+        
         # ── Primary: NVIDIA NeMo Retriever OCR ──
         if os.environ.get("NVIDIA_OCR_API_KEY") or os.environ.get("NVIDIA_API_KEY"):
             logging.info("NVIDIA OCR API key found. Utilizing NVIDIA NeMo Retriever OCR v1 for receipt processing.")
@@ -517,6 +519,7 @@ Raw receipt text:
                 return result
             else:
                 logging.warning(f"NVIDIA OCR failed: {result.get('error')} — falling back to Gemini/Tesseract")
+                errors.append(f"NVIDIA: {result.get('error')}")
 
         # ── Secondary: Gemini Vision ──
         if gemini_model is not None:
@@ -527,9 +530,16 @@ Raw receipt text:
                 return result
             else:
                 logging.warning(f"Gemini Vision failed: {result.get('error')} — falling back to Tesseract")
+                errors.append(f"Gemini: {result.get('error')}")
 
         # ── Fallback: Tesseract ──
         if not self._tesseract_available:
+            if errors:
+                return {
+                    "success": False,
+                    "error": "OCR failed: " + " | ".join(errors),
+                    "error_type": "processing_failed"
+                }
             return {
                 "success": False,
                 "error": "No OCR engine available. Configure NVIDIA_API_KEY, GEMINI_API_KEY or install Tesseract.",
