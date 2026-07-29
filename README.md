@@ -1,8 +1,12 @@
 # RupeeFlow 💸
 
+📸 Application Preview
+<img width="1470" height="833" alt="Screenshot 2026-07-27 at 10 34 37 PM" src="https://github.com/user-attachments/assets/2b8ae7eb-25a0-4168-9b40-64d2e9e6427c" />
+
+
 > **Your intelligent, AI-powered expense companion — built for modern Indian financial management.**
 
-![RupeeFlow](frontend/public/logo.png)
+
 
 RupeeFlow is a full-stack expense tracking platform that combines **AI-driven insights**, **shared wallet capabilities**, **receipt OCR scanning**, **multi-currency support**, and a bold **Neo-brutalism UI** to make personal finance tracking effortless and engaging.
 
